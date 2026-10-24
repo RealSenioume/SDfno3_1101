@@ -1,0 +1,17 @@
+# Build and test tooling for lolping.
+#
+# This file is NOT needed to run the application: the runtime dependencies
+# (PyQt5, pynput) are listed in requirements.txt.  Install both files in a
+# virtual environment:
+#
+#   python -m venv .venv
+#   .\.venv\Scripts\Activate.ps1
+#   python -m pip install -r requirements.txt -r requirements-dev.txt
+#
+# The floors below are the oldest releases that pip offers on Python 3.14
+# (checked against PyPI in October 2026); the upper bounds keep the build
+# reproducible across the semester.  See docs/07-build-and-release.md for the
+# Python 3.12 fallback if a PyInstaller release lags behind CPython.
+
+pytest>=8.4,<10
+pyinstaller>=6.15,<7
