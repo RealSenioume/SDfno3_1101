@@ -27,3 +27,14 @@ where = ["src"]
 testpaths = ["tests"]
 pythonpath = ["src"]
 addopts = "-q"
+
+# Editor/static-analysis configuration. The tests import modules from `src`
+# (the package) and from `tools` (standalone scripts) after adding them to
+# sys.path at run time; Pyright/Pylance cannot follow that, so the same two
+# folders are declared here. Without this, Pylance reports
+# "Import could not be resolved" for imports that work perfectly at run time.
+[tool.pyright]
+include = ["src", "tests", "tools"]
+extraPaths = ["src", "tools"]
+typeCheckingMode = "basic"
+reportMissingTypeStubs = false

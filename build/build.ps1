@@ -236,6 +236,14 @@ try {
         }
     }
 
+    # -- documentation parity ----------------------------------------------
+    # The bilingual documents drift silently; this is cheap and catches it at
+    # build time, before a release is cut. It needs no third-party packages.
+    Write-Step "Checking that the English and Chinese documents are in sync"
+    Invoke-Checked -FilePath $VenvPython `
+        -Arguments @((Join-Path $Root "tools\check_docs_sync.py")) `
+        -Step "check_docs_sync"
+
     # -- PyInstaller -------------------------------------------------------
     Write-Step "Building the executable with PyInstaller"
     Push-Location -LiteralPath $Root
