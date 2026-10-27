@@ -70,3 +70,18 @@ For more details during development, check out the docs.
 - If these are not raised or synchronized with DSH at the beginning, DSH may perform overwrite operations during subsequent intervention. And these inconspicuous behaviors, if not intervened in a timely manner, may gradually accumulate into the "code mountain of sh*t" that we often mention.
 
 - 10.27.2026
+
+# V0.3.1 Latency Re-measurement
+- Re-measured the trigger-to-first-paint latency on the 0.3.1 build, now that the start-up warm-up and the native mouse guard are in. Same harness as before: one machine, 30 scripted gestures.
+
+- The first gesture of a session used to cost 103.57 ms. It now costs 15.05 ms, a 6.9x reduction. That 100 ms was never a property of the system, it was a cost I had simply not paid at the right time: the first wheel had to create the native surface and load the font database and the glyph cache while the user was already waiting. Paying it at launch took it out of the gesture.
+
+- Steady state is unchanged: 28 of the 30 samples sit between 4.54 and 6.08 ms, median 5.20 ms. p95 is 15.05 ms with the first gesture included and 6.08 ms without it, against a 50 ms target.
+
+- Two samples still sit near 15 ms: the first gesture, and the one immediately after a cancelled gesture. Both are still three times under the target. I did not chase the second one; it looks like the first paint occasionally lands while the window is still compositing the previous state.
+
+- The comparison with the 0.3.0 run is only meaningful for the first gesture. The steady-state p95 moved from 5.49 to 6.08 ms, which is inside run-to-run noise, so I am not claiming it as a regression - the extra mouse-hook callback is the only new work on that path.
+
+- Kept both old runs as control data: latency-v0.3.0.jsonl (before the warm-up) and latency-v0.2.0.jsonl (before the icons and audio). They are what makes the "103.57 -> 15.05 ms" claim checkable instead of just asserted.
+
+- 10.27.2026

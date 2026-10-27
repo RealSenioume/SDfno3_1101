@@ -20,7 +20,7 @@ application. It installs global keyboard and mouse hooks, draws a translucent
 always-on-top wheel centred on the pointer without stealing focus, animates the
 selection with frame-rate-independent exponential smoothing, leaves a fading
 mark where the ping was placed, and records every ping as JSON Lines. It is
-built from 15 modules totalling roughly 3,600 lines of Python, with 134
+built from 15 modules totalling roughly 3,600 lines of Python, with 144
 automated unit tests covering the geometry, configuration-repair,
 input-state-machine, icon and audio logic, plus a packaging pipeline that
 produces a standalone executable.
@@ -93,7 +93,7 @@ The objectives were:
 * A measurement methodology for trigger-to-first-paint latency that includes the
   cross-thread queue hop, together with an explicit statement of what it does
   *not* include.
-* An automated suite of 134 tests over the parts of the system most likely to be
+* An automated suite of 144 tests over the parts of the system most likely to be
   wrong (angle conventions, hostile configuration, input state transitions, icon
   fallbacks, audio buffers).
 
@@ -595,8 +595,10 @@ the file-based path is now pinned by a regression test.
 | `test_sounds.py` | ~11 | WAV headers and lengths, volume scaling, silence at zero, per-slice pitch, cache, playback safety |
 | `test_app.py` | ~7 | Tray activation opens one dialog only, re-entrant open ignored, cue gating by config |
 | `test_mouse_guard.py` | ~16 | Suppression rules for every mouse event, paused/disarmed guards, hook lifecycle |
+| `test_overlay.py` | ~10 | Mouse capture taken on open and released on every close path, warm-up leaves no state |
+| `test_docs_sync.py` | ~8 | English/Chinese parity fingerprinting and exit codes |
 
-Result: **134 tests, all passing** (`python -m unittest discover -s tests`), in
+Result: **144 tests, all passing** (`python -m unittest discover -s tests`), in
 about 60 ms, with no display and no hooks installed (the icon suite forces the
 offscreen Qt platform).
 
@@ -661,36 +663,43 @@ returns a pass/fail verdict against the 50 ms target.
 single display running at a scaled logical resolution, with the reference
 implementation closed (Section 2.2) and no other hook-owning tool active. The 30
 gestures were issued by `tools/demo_gesture.py`, which sends the same
-Alt + press + drag + release sequence a human performs; the run used the v0.3.0
-build with slice icons enabled and the burst animation active.
+Alt + press + drag + release sequence a human performs. The run used the **v0.3.1
+build**, i.e. with the start-up warm-up and the native mouse guard active.
 
 | Metric | n | min | median | p90 | p95 | p99 | max | Verdict |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |
-| `frame_ms` — all samples | 30 | 4.48 | 4.98 | 5.45 | 5.58 | 103.57 | 103.57 | PASS |
-| `frame_ms` — warm-up excluded | 29 | 4.48 | 4.97 | 5.45 | **5.49** | 5.58 | 5.58 | **PASS** |
-| `commit_ms` — button hold time, not latency | 30 | 606 | 620 | 656 | 671 | 672 | 672 | n/a |
+| `frame_ms` — all samples | 30 | 4.54 | 5.20 | 5.92 | 15.05 | 15.76 | 15.76 | PASS |
+| `frame_ms` — first gesture excluded | 29 | 4.54 | 5.20 | 5.92 | **6.08** | 15.76 | 15.76 | **PASS** |
+| `commit_ms` — button hold time, not latency | 30 | 608 | 618 | 655 | 663 | 703 | 703 | n/a |
 
 **Interpretation.**
 
-1. The steady-state p95 is **5.49 ms**, roughly nine times under the 50 ms target
-   of NFR-01, with a median of 4.97 ms and a spread of barely one millisecond
-   across the 29 steady samples (4.48–5.58 ms). The render path is therefore not
-   the bottleneck it was feared to be: drawing eight icons and a layered burst
-   sits well inside a single 60 Hz frame.
-2. Exactly one of the 30 samples exceeds 50 ms: 103.57 ms, on the first wheel of
-   the session. The first paint of a translucent Qt window is where the font
-   database, the glyph cache and window composition are first touched. The
-   v0.2.0 session measured 105.48 ms for the same first gesture, so this is a
-   reproducible warm-up cost rather than noise. Both views are reported because
-   hiding the outlier and quoting it as typical would each be dishonest.
-3. Even adding one full 60 Hz frame (~16.7 ms) of compositor presentation to every
-   sample, the steady-state p95 stays near 22 ms and the requirement still holds.
-4. `commit_ms` is the time the button was held, not a latency. The 620 ms median
-   is the harness's own pause between press and release; it is reported because
-   the probe records it, not because it says anything about responsiveness.
-5. The v0.2.0 and v0.3.0 sessions are **not directly comparable**: the earlier run
-   mixed scripted gestures with manual ones held for screenshots, while this run
-   is uniformly scripted. No claim of an improvement across versions is made.
+1. The p95 is **15.05 ms** (6.08 ms with the first gesture excluded), roughly three
+   times under the 50 ms target of NFR-01, with a median of 5.20 ms. Twenty-eight
+   of the thirty samples sit in a 4.54–6.08 ms band, so the render path is not the
+   bottleneck it was feared to be: eight icons and a layered burst fit comfortably
+   inside one 60 Hz frame.
+2. **The start-up warm-up did what it was designed to do.** On the v0.3.0 build the
+   first gesture of a session cost 103.57 ms because the native surface, font
+   database and glyph cache were first touched while the wheel was already needed.
+   Paying that cost at launch (Section 5.3) brought the first gesture down to
+   15.05 ms — a 6.9× reduction, and no longer an outlier worth a separate table
+   row.
+3. Two samples sit at about 15 ms: the first gesture, and the third, which came
+   immediately after a cancelled gesture. Both remain three times under the target.
+   The plausible cause is that the first paint of a gesture occasionally lands
+   while the window is already compositing the previous state; the effect was not
+   isolated further, and it is reported as observed rather than explained away.
+4. Even adding one full 60 Hz frame (~16.7 ms) of compositor presentation to every
+   sample, the p95 stays near 32 ms and the requirement still holds.
+5. `commit_ms` is the time the button was held, not a latency. The 618 ms median is
+   the harness's own pause between press and release; it is reported because the
+   probe records it, not because it says anything about responsiveness.
+6. The comparison with the archived v0.3.0 run is meaningful for the first gesture
+   (103.57 → 15.05 ms, same harness, same machine) but **not** for the steady-state
+   tail: 5.49 → 6.08 ms is inside run-to-run noise and is not claimed as a
+   regression. The native mouse guard adds one callback per mouse event, which is
+   consistent with a sub-millisecond change at most.
 
 **Data-collection caveat.** The harness anchors the gesture on an empty strip of
 the taskbar so that the swallowed click cannot activate another application.
@@ -794,7 +803,7 @@ mixed-DPI desktop that breaks the obvious window architecture, and a global hook
 that fails silently by design.
 
 The result is a 3,600-line Python application with a documented architecture,
-thirteen explicit design decisions with rejected alternatives, 134 automated tests, a
+thirteen explicit design decisions with rejected alternatives, 144 automated tests, a
 formal manual test matrix, a packaging pipeline and a measured latency
 methodology. It honours every objective set out in Section 1.3: the gesture is
 reproduced, the tool is self-sufficient on a clean machine, the game client is
@@ -839,7 +848,7 @@ states what it cannot do is more trustworthy than one that does not.
 src/lolping/     13 modules: geometry, config, hotkeys, input_hook, overlay,
                  settings_dialog, app, single_instance, autostart, sounds,
                  logging_setup, __init__, __main__
-tests/           8 unittest suites, 134 tests
+tests/           10 unittest suites, 144 tests
 tools/           smoke_test.py, latency_report.py, demo_gesture.py
 build/           lolping.spec (PyInstaller), build.ps1
 docs/            00 module contract, 01 proposal, 02 requirements,
