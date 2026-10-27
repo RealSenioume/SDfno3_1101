@@ -32,3 +32,4 @@ For more details during development, check out the docs.
 
 # V.0.3.0 Update
 Now it has animations and sound effects that can be used for demonstrations. However, to avoid potential copyright issues, animations, textures, sound effects, and other related content are all generated using DSH (DeepSeek Harness).
+By the way, I adjusted the temporary storage path left in the document when DSH runs locally.

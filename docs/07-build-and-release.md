@@ -21,7 +21,7 @@ release. The short version is at the top, the reasoning and pitfalls follow.
 ## 0. At a glance
 
 All commands are Windows PowerShell, run from the repository root
-(`D:\DSH_workspace\lolping`).
+(the repository root).
 
 | Task | Command |
 | --- | --- |
@@ -70,7 +70,7 @@ reads `pythonpath = ["src"]` from `[tool.pytest.ini_options]`.
 ## 2. Development environment
 
 ```powershell
-cd D:\DSH_workspace\lolping
+cd path\to\SDfno3_1101
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 python -m pip install --upgrade pip
@@ -415,7 +415,7 @@ scanning on the build machine, rebuild, and re-enable it afterwards.
 | Frozen app uses a stale description/size | PyInstaller caches analysis in `build\_work`; always `-Clean` after changing the spec, hidden imports or the Python version. |
 | `running scripts is disabled on this system` | `powershell -NoProfile -ExecutionPolicy Bypass -File .\build\build.ps1` (or `pwsh -NoProfile -ExecutionPolicy Bypass -File ...`); alternatively change the policy for the current user. |
 | `pip` cannot find PyQt5/PyInstaller on 3.14 | Use the Python 3.12 fallback (section 6). |
-| Build path with non-ASCII characters fails deep inside PyInstaller | Keep the checkout at an ASCII path such as `D:\DSH_workspace\lolping`; some tooling still mishandles CJK paths. |
+| Build path with non-ASCII characters fails deep inside PyInstaller | Keep the checkout at an ASCII path such as `C:\dev\SDfno3_1101`; some tooling still mishandles CJK paths. |
 | `lolping.exe` starts a second copy but nothing appears | By design: the single-instance guard exits the second copy. Close the tray icon first. |
 | `--self-test` hangs in the build | A modal error dialog is waiting; the script kills the process after 120 s and fails. Reproduce from a console to read the dialog. |
 
@@ -455,7 +455,7 @@ Run every line from the repository root and keep the output for the report.
 If the PowerShell script cannot be used, the same steps by hand:
 
 ```powershell
-cd D:\DSH_workspace\lolping
+cd path\to\SDfno3_1101
 python -m venv .venv-build
 .\.venv-build\Scripts\python.exe -m pip install -r requirements.txt -r requirements-dev.txt
 $env:PYTHONPATH = "src"

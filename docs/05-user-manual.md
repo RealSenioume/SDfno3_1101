@@ -21,8 +21,7 @@ by the application at run time; no Riot Games artwork or audio is included.
 
 1. Install **Python 3.14** from python.org. During installation, select "Add
    python.exe to PATH".
-2. Open a terminal in the project folder, for example
-   `D:\DSH_workspace\lolping`.
+2. Open a terminal in the repository folder (the one you cloned).
 3. Create and activate a virtual environment, then install the pinned
    dependencies:
 
@@ -236,7 +235,7 @@ screen position of each commit.
 
 1. Open the tray menu and choose **Settings…**; untick **Start with Windows**
    and press OK. Then choose **Quit**.
-2. Delete the project folder (for example `D:\DSH_workspace\lolping`), or the
+2. Delete the project folder (the one you cloned), or the
    folder containing the packaged executable.
 3. Optionally delete `%APPDATA%\lolping-desktop\` to remove your settings and ping
    logs. Copy `pings.jsonl` first if you want to keep it.

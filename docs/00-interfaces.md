@@ -4,7 +4,7 @@ This file is the single source of truth for module boundaries. Read it before
 writing code. Do **not** change a signature without telling the Lead: other
 files are being written in parallel against it.
 
-Project root: `D:\DSH_workspace\lolping`
+Project root: the repository root (the folder that contains `src/`)
 Package root: `src/lolping`
 
 Target: Python 3.14 + PyQt5 5.15.11 + pynput 1.8.2, Windows 11. No new runtime

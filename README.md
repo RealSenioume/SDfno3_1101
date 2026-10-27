@@ -53,13 +53,20 @@ contains no Riot Games assets and no binary media files.
 
 ## Quick start
 
-```bat
-cd (your file's location)
+```powershell
+git clone https://github.com/RealSenioume/SDfno3_1101
+cd SDfno3_1101
+
 python -m venv .venv
-.venv\Scripts\activate
+.\.venv\Scripts\Activate.ps1
 pip install -r requirements.txt
+
+$env:PYTHONPATH = "src"   # run from the source tree without installing it
 python -m lolping
 ```
+
+Already have the files? Skip the first two lines and `cd` into the folder that
+contains `src`, `requirements.txt` and `pyproject.toml`.
 
 lolping starts in the system tray. Hold **Alt**, press and hold the **left
 mouse button**, drag away from the cursor position, and release over the sector
