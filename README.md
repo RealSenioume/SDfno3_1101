@@ -1,3 +1,5 @@
+English | [简体中文](README.zh-CN.md)
+
 # lolping
 
 A desktop ping-wheel overlay for Windows 11, in the visual style of the League
@@ -166,7 +168,7 @@ MIT License. See the `LICENSE` file in the repository root.
 
 ## Riot Games disclaimer
 
-lolping is not endorsed by Riot Games and does not reflect the views or
+This lolping is not endorsed by Riot Games and does not reflect the views or
 opinions of Riot Games or anyone officially involved in producing or managing
 League of Legends. League of Legends and Riot Games are trademarks or
 registered trademarks of Riot Games, Inc.
