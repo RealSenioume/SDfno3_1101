@@ -34,14 +34,30 @@ For more details during development, check out the docs.
 
 - 10.24.2026
 
-# V 0.3.0 Update
+# V0.3.0 Update
 - Now it has animations and sound effects that can be used for demonstrations. However, to avoid potential copyright issues, animations, textures, sound effects, and other related content are all generated using DSH (DeepSeek Harness).
 
 - By the way, I adjusted the temporary storage path left in the document when DSH runs locally.
 
 - 10.27.2026
 
-# V 0.3.1 Update
-- Now, trigger gesture will not affect other object, icon, etc on the windows.
+# V0.3.1 Update
+- Woooooooow, Major update is here. Now, trigger gesture will not affect other object, icon, etc on the windows.
+
+- Fixed the biggest usability problem: the trigger gesture no longer touches anything on the desktop. It took three attempts, and the first two were wrong in a useful way.
+
+- Attempt 1: as soon as the wheel opened I called SetCapture so that the window underneath would get WM_CAPTURECHANGED and cancel whatever it started. This helped sometimes but not always.
+
+- Attempt 2: I measured the first wheel of a session at 103.57 ms against about 5 ms for every later one, so the desktop had ~100 ms to start a rubber-band selection or an icon drag before my capture arrived. I moved that cost to start-up by pre-creating and pre-painting one window per screen at launch. The first gesture became as fast as the others, but the bug was still there: with a 1000 Hz mouse, even a 2 ms window still gets a move event. This is the point where "just make it faster" stopped being a valid plan.
+
+- Attempt 3 (the fix): a native low-level mouse hook (WH_MOUSE_LL) that returns 1 and drops the events before any window sees them. It has to be installed BEFORE pynput, because Windows calls the most recently installed hook first - so pynput still sees the gesture and the guard removes it from everything below. The cost is that Alt + click is now reserved for lolping while it runs; there is a "Reserve the trigger for lolping" checkbox in Settings to turn this off and go back to the old behaviour.
+
+- Also fixed: sound never played. winsound refuses SND_MEMORY together with SND_ASYNC ("Cannot play asynchronously from memory"), and playing synchronously from memory would freeze the wheel, so the generated WAV is now written once to a temp cache file and played by filename.
+
+- Also fixed: a tray double-click opened two settings windows stacked on each other, because Windows sends Trigger and then DoubleClick. Now only DoubleClick opens the window, and the handler refuses to re-enter.
+
+- Moved the data folder from %APPDATA%\lolping to %APPDATA%\lolping-desktop, because the installed reference app already owns the old folder name. Also rewrote the README quick start: no hard-coded local path any more, and it now includes the PYTHONPATH step that the old one was missing (the old instructions actually did not run).
+
+- Version strings in the docs were a mess (some still said 0.2.0), so everything now says 0.3.1. Unit tests: 134, all passing.
 
 - 10.27.2026
