@@ -1,8 +1,8 @@
-# 4. Test plan — lolping v0.2.0
+# 4. Test plan — lolping v0.3.0
 
 ## 4.1 Purpose and scope
 
-This plan describes how lolping v0.2.0 is verified against
+This plan describes how lolping v0.3.0 is verified against
 `docs/02-requirements.md`: unit tests of the pure logic, system tests of the
 complete application on a documented Windows matrix, and measurement protocols
 for the non-functional requirements. Build verification is covered by
@@ -10,13 +10,14 @@ for the non-functional requirements. Build verification is covered by
 
 ## 4.2 Objectives
 
-1. Every functional requirement (FR-01 to FR-22) is exercised by at least one
+1. Every functional requirement (FR-01 to FR-28) is exercised by at least one
    test case.
 2. All eight sectors and all three cancel paths behave correctly.
 3. The application survives a hostile config, a second launch, screen changes
    and a dead input listener without crashing.
 4. NFR-01 to NFR-04 are measured by a repeatable protocol and reported as
    p50/p95 values.
+5. Icon drawing and sound synthesis overhead stay within NFR-13 and NFR-14.
 
 ## 4.3 Strategy
 
@@ -76,7 +77,7 @@ environment to tell an environmental problem from a general one.
 | UT-G08 | geometry | `sector_span` bounds | 45° spans; adjacent spans share one edge; no overlap |
 | UT-G09 | geometry | `sector_label_point` at 0.72 R | Point on the expected radius and angle |
 | UT-G10 | geometry | `ease_alpha` at 0 and large dt; `approach` converges | 0, near 1; monotonic and snaps |
-| UT-C01 | config | Defaults | Match requirements section 2.4.5 |
+| UT-C01 | config | Defaults | Match requirements section 2.4.6 |
 | UT-C02 | config | Save then load a modified config | Round-trip preserves fields |
 | UT-C03 | config | Load a missing file | Defaults, no exception |
 | UT-C04 | config | Load truncated or invalid JSON | Defaults, no exception |
@@ -85,6 +86,7 @@ environment to tell an environmental problem from a general one.
 | UT-C07 | config | Unknown JSON keys | Ignored; known fields load |
 | UT-C08 | config | Atomic save | No temporary file left; clean replace |
 | UT-C09 | config | Path helpers with `APPDATA` set | Config and logs under the app data folder |
+| UT-C10 | config | v0.3 fields: icon ids, image paths, icon size, volume, cue flags | Defaults applied; bad icon id/path repaired; volume clamped to 0–1; arrays padded to eight |
 | UT-H01 | hotkeys | `parse_hotkey("ctrl+shift+q")` | `{"ctrl", "shift", "q"}` |
 | UT-H02 | hotkeys | Case and order independence | `"Alt+Q"` and `"q+alt"` equal |
 | UT-H03 | hotkeys | `format_hotkey` of the default set | `"Ctrl+Shift+Q"` |
@@ -99,8 +101,8 @@ environment to tell an environmental problem from a general one.
 | ID | Pri | Test | Steps | Expected |
 | --- | --- | --- | --- | --- |
 | TC-01 | P1 | Start-up and CLI | Run `python -m lolping`; check `--help`; run `--self-test`. | Tray icon appears within the cold-start budget; `--help` lists the documented flags; `--self-test` exits 0 after printing `SELF-TEST OK` with no visible overlay; no traceback. |
-| TC-02 | P1 | Open at cursor | With a windowed app focused, hold Alt and the left button. | Wheel centred on the cursor; hover matches the drag direction. |
-| TC-03 | P1 | Commit every sector | For each clock direction, open, drag out, release, inspect the log. | Matching name and sector index logged; one mark per commit. |
+| TC-02 | P1 | Open at cursor | With a windowed app focused, hold Alt and the left button. | Wheel centred on the cursor, scaling and fading in over about 130 ms; hover matches the drag direction. |
+| TC-03 | P1 | Commit every sector | For each clock direction, open, drag out, release, inspect the log. | Matching name and sector index logged; one burst per commit. |
 | TC-04 | P1 | Hover feedback | Move the cursor through all sectors and into the dead zone. | Emphasis follows the cursor; centre label matches; no emphasis inside the dead zone. |
 | TC-05 | P1 | Dead-zone cancel | Open and release without leaving the dead zone. | Wheel closes; no mark; no new log line. |
 | TC-06 | P1 | Esc cancel | Open, drag into a sector, press Esc, then release. | Wheel closes on Esc; nothing logged; release has no effect. |
@@ -113,7 +115,7 @@ environment to tell an environmental problem from a general one.
 
 | ID | Pri | Test | Steps | Expected |
 | --- | --- | --- | --- | --- |
-| TC-11 | P1 | Settings dialog | Inspect every control; change radius, labels, theme and a name; OK. | All documented controls labelled; changes apply on the next wheel; new name logged. |
+| TC-11 | P1 | Settings dialog | Inspect every control, including Show icons, Icon size, the per-slice icon choosers, Volume and Hover ticks; change radius, labels, theme, an icon and a name; OK. | All documented controls labelled; changes apply on the next wheel; the new name and icon are used. |
 | TC-12 | P2 | Validation | Set slider extremes; enter a malformed quit hotkey; OK. | Values clamp to documented ranges; inline feedback; no crash. |
 | TC-13 | P2 | Reset to defaults | Change settings, press Reset to defaults, OK. | All values return to the documented defaults. |
 | TC-14 | P1 | Live rebind | Change the trigger to Ctrl + right; try the old and new gesture. | Only the new gesture works; no restart needed. |
@@ -131,7 +133,7 @@ environment to tell an environmental problem from a general one.
 | TC-21 | P2 | Tray entries | Use Ping history log and Open config folder. | Log opens in the default viewer; config folder opens in Explorer. |
 | TC-22 | P2 | Pause/resume | Pause, gesture, Resume, gesture. | Nothing opens while paused; the menu shows Resume; gesture restored. |
 | TC-23 | P1 | Single instance | Launch a second `python -m lolping` while running. | Second process exits; one tray icon; running instance unaffected. |
-| TC-24 | P2 | Sound | Enable sound, commit, cancel; disable sound, commit. | Cue on commit; silence on cancel; silence when disabled. |
+| TC-24 | P2 | Sound cues | Enable sound; open, hover, commit and cancel; disable sound and repeat. | Each enabled cue plays once per event (hover once per slice change); the master switch silences all cues. |
 
 ### 4.6.4 Displays and robustness
 
@@ -143,6 +145,17 @@ environment to tell an environmental problem from a general one.
 | TC-28 | P1 | Exclusive fullscreen | On E7–E9, start a fullscreen application and attempt the gesture. | Behaviour recorded (wheel visible or not); no crash or stuck wheel; limitation documented from this evidence. |
 | TC-29 | P2 | Elevated target | On E10–E12, focus an elevated window and attempt the gesture; repeat with lolping elevated. | Behaviour recorded; no crash; documented as a limitation. |
 | TC-30 | P2 | Autostart | Enable, sign out and in; disable and inspect the startup list. | App starts in the tray; disabling removes the entry. |
+
+### 4.6.5 Slice icons, animations and sound
+
+| ID | Pri | Test | Steps | Expected |
+| --- | --- | --- | --- | --- |
+| TC-31 | P1 | Every slice shows its icon | Open the wheel on E1 and inspect all eight slices. | Each slice shows its configured vector icon; the eight default icons are visually distinct; the hovered icon grows slightly. |
+| TC-32 | P1 | Change an icon in Settings | In Settings assign `danger` to slice 0 and press OK; reopen the wheel and commit over slice 0. | Slice 0 shows the warning triangle immediately after OK; the burst icon pop shows the same icon. |
+| TC-33 | P1 | Broken custom image | Quit, set `sector_images[3]` to a non-existent PNG, start and open the wheel; then repeat with a valid 64×64 PNG. | Missing file: slice 3 falls back to its vector icon with no crash and no blank slice. Valid file: the PNG appears clipped to a circle. |
+| TC-34 | P2 | Hover ticks | Enable sound and Hover ticks, then move through five slices, pausing on each. | Exactly one tick per slice change (including entering the dead zone), not one per frame; disabling Hover ticks removes only the tick. |
+| TC-35 | P1 | Volume 0 | Set volume to 0, then open, hover, commit and cancel. | No audible output from any cue; the wheel behaves normally. |
+| TC-36 | P2 | Burst direction | Commit four pings in four different sectors and watch the burst each time. | The five streaks point outward along the committed slice's direction; two rings are visible, with the icon pop and the name above them. |
 
 ## 4.7 Performance protocols
 
@@ -183,19 +196,32 @@ between applications. Record the working set every 5 minutes and note crashes,
 stuck wheels or missing log lines. No numeric threshold; report the growth trend
 and crash count.
 
+### 4.7.5 Icon and sound cost (PT-05, NFR-13 and NFR-14)
+
+- **Icon frame cost.** Open the wheel on E1 with `--latency-probe` and record 20
+  gestures with `show_icons` on and 20 with it off; the p95 difference in
+  `frame_ms` is the icon cost, which must stay within 5 ms. A frame-timing
+  harness in a debug build may be used instead of the user-visible probe.
+- **Synthesis cost.** In a Python session, call `sounds.render_wav` for each cue
+  after `sounds.clear_cache()` and time the first call; repeat the call to time
+  the cached path. The cold call must be below 5 ms and the cached call
+  effectively free. Record both tables in the evidence set.
+
 ## 4.8 Evidence to capture
 
 | ID | Evidence | Produced by | Storage |
 | --- | --- | --- | --- |
 | EVID-01 | Unit-test output (all pass) | `pytest` | `evidence/unit-tests.txt` |
 | EVID-02 | Manual results table with dates and environment IDs | Tester | `evidence/manual-results.md` |
-| EVID-03 | Screenshots: wheel, hover, mark, settings | Tester | `evidence/screens/` |
+| EVID-03 | Screenshots: wheel, hover, burst, settings | Tester | `evidence/screens/` |
 | EVID-04 | Raw `latency.jsonl` per environment plus percentile summary | Probe, `tools/latency_report.py` | `evidence/latency/` |
 | EVID-05 | Task Manager CPU/RAM captures and cold-start sheet | Tester | `evidence/perf/` |
 | EVID-06 | Sample `pings.jsonl` with 20+ commits | Application | `evidence/logs/` |
 | EVID-07 | Screenshots and notes for E7–E12 | Tester | `evidence/limitations/` |
 | EVID-08 | Smoke-test output of the packaged build | `tools/smoke_test.py` | `evidence/smoke.txt` |
 | EVID-09 | Optional screen recording of the gesture | Tester | `evidence/gesture.mp4` |
+| EVID-10 | Icon sheet screenshot: all ten vector icons at default and large size | Tester | `evidence/screens/icons.png` |
+| EVID-11 | Waveform capture of the four synthesised cues | Audio editor or generated plot | `evidence/audio/cues.png` |
 
 Files and screenshots are named with the environment ID and date (for example
 `E2-wheel-125dpi.png`). The evidence folder is collected for the report and is
@@ -208,9 +234,9 @@ is frozen; the matrix machines are available; the unit tests exist and run; this
 plan has been reviewed.
 
 **Exit:** all P1 cases pass; no S1 or S2 defect is open; every S3 defect has a
-documented workaround; NFR-01 to NFR-04 are measured and meet their thresholds;
-the evidence checklist is complete; results are summarised for section 6 of the
-report.
+documented workaround; NFR-01 to NFR-04 and NFR-13/NFR-14 are measured and meet
+their thresholds; the evidence checklist is complete; results are summarised for
+section 6 of the report.
 
 ## 4.10 Traceability
 
@@ -238,3 +264,9 @@ report.
 | NFR-09, NFR-10 | Inspection during TC-11 and TC-21 |
 | NFR-11 | UT-G01 to UT-H03, IT-01 to IT-03 |
 | NFR-12 | TC-06, TC-11 |
+| FR-23, FR-24 | TC-31, TC-32, TC-33 |
+| FR-25 | TC-02 |
+| FR-26 | TC-03, TC-36 |
+| FR-27 | TC-24, TC-34 |
+| FR-28 | TC-35 |
+| NFR-13, NFR-14 | PT-05 (4.7.5) |

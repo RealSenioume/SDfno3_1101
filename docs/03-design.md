@@ -1,6 +1,6 @@
 # lolping — Design Document
 
-Version 0.2.0 · Windows 11 · Python 3.14 · PyQt5 5.15.11 · pynput 1.8.2
+Version 0.3.0 · Windows 11 · Python 3.14 · PyQt5 5.15.11 · pynput 1.8.2
 
 This document explains *how* the system is built and *why* it is built that way.
 Requirements live in [`02-requirements.md`](02-requirements.md), the test
@@ -13,7 +13,7 @@ strategy in [`04-test-plan.md`](04-test-plan.md), operation in
 
 lolping draws a League-of-Legends-style radial "ping wheel" on the Windows
 desktop. Holding a trigger gesture shows a wheel at the pointer; releasing on a
-slice leaves a short-lived mark on screen and records the choice.
+slice leaves a short-lived burst on screen and records the choice.
 
 **It is not an in-game tool.** It does not read, inject into, or draw inside the
 League of Legends client, and it never sends input to another process. That
@@ -29,7 +29,7 @@ testable without the game running.
 | Never steal focus from the app underneath | `Qt.Tool` + `WindowDoesNotAcceptFocus` + `WA_ShowWithoutActivating`; no `activateWindow()` anywhere |
 | Never crash on bad configuration | `Config.from_dict` is a total function: any input yields a valid config |
 | A lost input hook must not be silent | Supervisor thread restarts dead listeners and reports through the tray |
-| No binary assets, no Riot-owned files | Tray icon, wheel, and ping sound are generated in code |
+| No binary assets, no Riot-owned files | Tray icon, slice icons, burst and sound cues are generated in code |
 | One screen, three screens, negative coordinates | One overlay window per `QScreen`, lazily created |
 | Testable without a display or a game | Pure geometry/config modules, `--self-test`, offscreen smoke test |
 
@@ -43,12 +43,13 @@ flowchart TD
         APP[app.py<br/>tray, wiring, logs]
         OVL[overlay.py<br/>per-screen windows, painting]
         DLG[settings_dialog.py]
+        ASR[assets.py<br/>vector icon paths + caches]
     end
     subgraph "system glue"
         HOOK[input_hook.py<br/>pynput listeners]
         SINGLE[single_instance.py]
         AUTO[autostart.py]
-        SND[sounds.py]
+        SND[sounds.py<br/>open/hover/commit/cancel cues]
         LOG[logging_setup.py]
     end
     subgraph "pure logic (no Qt)"
@@ -65,7 +66,9 @@ flowchart TD
     APP --> LOG
     OVL --> GEO
     OVL --> CFG
+    OVL --> ASR
     DLG --> CFG
+    DLG --> ASR
     DLG --> HK
     HOOK --> CFG
     HOOK --> HK
@@ -84,12 +87,13 @@ plain `unittest` and reasoned about in isolation.
 | `config.py` | Schema, defaults, repair-on-load, atomic save, data paths | `Config.load/save/from_dict` |
 | `hotkeys.py` | Parse/format `"ctrl+shift+q"` | `parse_hotkey`, `format_hotkey` |
 | `input_hook.py` | Own the OS hooks, normalise keys, emit Qt signals, supervise listeners | `InputBridge`, `InputHook` |
-| `overlay.py` | Window lifecycle, painting, animation, ping marks | `OverlayManager`, `OverlayWindow` |
+| `overlay.py` | Window lifecycle, painting, animation, slice icons, ping bursts | `OverlayManager`, `OverlayWindow` |
+| `assets.py` | Original vector icon paths, painter scaling, pixmap and file caches | `draw_icon`, `load_pixmap`, `resolve_icon`, `ICON_IDS` |
 | `settings_dialog.py` | Edit a `Config` with validation | `SettingsDialog.edit` |
 | `app.py` | Bootstrap, tray menu, wiring, ping/latency logs, CLI | `PingApp.main`, `run_self_test` |
 | `single_instance.py` | One process per desktop session | `SingleInstance` |
 | `autostart.py` | `HKCU\...\Run` entry | `set_enabled`, `is_enabled` |
-| `sounds.py` | Synthesised ping tone, async playback | `play_ping` |
+| `sounds.py` | Synthesised open/hover/commit/cancel cues, cached WAV bytes, asynchronous playback | `play`, `render_wav`, `CUE_NAMES` |
 | `logging_setup.py` | Rotating file log, excepthook | `setup_logging` |
 
 ### 3.3 Why this split
@@ -284,14 +288,11 @@ This avoids the classic radial-menu bug where slices swap places mid-drag.
 
 ### 7.4 Ping mark
 
-On commit the wheel is cleared and a mark is appended at the wheel centre:
-
-| Property | Value | Purpose |
-| --- | --- | --- |
-| Duration | `Config.mark_duration_ms` (default 900 ms) | Long enough to notice, short enough not to litter |
-| Ring | radius 20 → 90 px, quadratic ease-out, alpha 235 → 0 | Reads as "emitted here" |
-| Dot | radius 8 → 4.8 px, alpha 255 → 0 | Anchors the exact point |
-| Label | sector name above the ring, 4-direction black halo | Legible over bright game art |
+On commit the wheel is cleared and a mark is appended at the wheel centre.
+Since v0.3.0 that mark is the layered burst described in §7.7: two staggered
+rings, five directional streaks along the committed slice, an icon pop and the
+sector name. Its duration is `Config.mark_duration_ms` (default 900 ms, range
+300–4000). Marks are independent of the wheel window and outlive it.
 
 ### 7.5 The stale-frame problem (and its fix)
 
@@ -310,6 +311,127 @@ self.hide()
 
 The same trick is used at `begin()`: state is reset and repainted synchronously
 so the first visible frame is already correct.
+
+### 7.6 Slice icons and the icon engine
+
+Every slice can draw an icon: an original vector icon or a user-supplied PNG
+(FR-23, FR-24). Both are drawn on the 0.60 R circle inside the slice, grow by
+10 % while hovered and scale with the wheel-open animation. The rim labels move
+out to 0.80 R when icons are shown so that text never overlaps the artwork.
+
+**Vector paths.** `assets.py` authors each icon as `QPainterPath` primitives in
+a unit square (0..1 on both axes, y downwards) plus a draw mode (`fill` or
+`stroke`). `draw_icon()` translates and scales the painter to the target
+`QRectF`, so one path is crisp at 24 px on the wheel and at 96 px in the burst
+icon pop; nothing is pre-rasterised. Ten ids are registered:
+
+| id | Shape | Default slice |
+| --- | --- | --- |
+| `on_my_way` | right-pointing arrow | 0 |
+| `all_in` | double chevron | 1 |
+| `assist` | plus | 2 |
+| `vision` | eye with pupil | 3 |
+| `missing` | question mark and dot | 4 |
+| `enemy_vision` | slashed eye | 5 |
+| `retreat` | left-pointing arrow | 6 |
+| `push` | upward arrow over a base bar | 7 |
+| `danger` | warning triangle with exclamation | available in Settings |
+| `generic` | ring with a centre dot | fallback |
+
+**Caches.** `icon_pixmap()` keys rendered icons by `(icon id, size, colour,
+device-pixel-ratio)`; `load_pixmap()` keys scaled user images by `(path, size,
+DPR)` and stores `None` for a path that cannot be loaded, so a broken custom
+image costs one failed load rather than one per frame. Both caches are cleared
+with `clear_caches()` when the theme accent changes; neither is touched per
+frame.
+
+**Fallback chain.** `resolve_icon()` returns the configured id if it is
+registered, otherwise the default id for that slice, otherwise `generic`
+(ring + dot). `load_pixmap()` returns `None` for a missing, unreadable or
+non-image file, and the renderer falls back to the vector path for that slice.
+A bad `sector_images` entry therefore degrades one icon, never the frame.
+
+**Drawing rule.** Custom images are scaled with `KeepAspectRatio` and clipped to
+a circle before being painted, so a rectangular PNG still looks like a slice
+icon. The same `_draw_slice_icon()` helper is used for the slice and for the
+burst icon pop, which keeps the two consistent.
+
+### 7.7 Open animation and release burst
+
+Both animations are driven by the existing 60 Hz frame loop; neither changes
+hit testing, which is always computed from `QCursor.pos()`.
+
+**Open animation.** When `begin()` shows the wheel, `_opened_at` records the
+frame time and the wheel plays in over 130 ms:
+
+| Property | Value |
+| --- | --- |
+| Duration | 130 ms (`_OPEN_DURATION = 0.13`) |
+| Start scale | 70 % of full radius (`_OPEN_START_SCALE = 0.70`) |
+| Easing | cubic ease-out, `e = 1 − (1 − p)³` |
+| Sector radius | `R × (0.70 + 0.30 e)` |
+| Sector, glow and label alpha | multiplied by `e` |
+| Centre disc and its text | multiplied by `max(0.25, e)` so they do not vanish |
+
+The animation only changes radii and alpha; the sector under the cursor is
+still resolved from the pointer, so a gesture completed inside 130 ms commits
+normally.
+
+**Release burst.** On commit the wheel is cleared and a `_Mark` (name, position,
+start time, duration, committed sector) animates for `mark_duration_ms`. Its
+layers are:
+
+| Layer | Timing | Behaviour |
+| --- | --- | --- |
+| Ring 1 | `t = 0 … 1` | radius 18 → 96 px with ease-out; alpha 235 → 0; pen 4 → 1 px |
+| Ring 2 | `t = 0.14 … 1` | the same ring, delayed by 14 % of the animation |
+| Streaks (five) | `t = 0.05 … 0.55` | five 26 px lines at the slice centre angle −18°, −9°, 0°, +9°, +18°; fly from radius 46 px to 92 px; pen 3 px; alpha 220 → 0; skipped when the sector is unknown |
+| Icon pop | `t = 0 … 0.30` | the committed slice's icon with an ease-out-back scale, overshooting to about 1.12, then fading over the last 40 % of the animation |
+| Name label | tail of `t` | the sector name above the outer ring, with a halo, fading with the tail |
+
+The burst reuses the same icon the slice showed, so the animation visually
+returns the chosen ping to the wheel centre. A cancel creates no mark at all.
+
+### 7.8 Sound synthesis
+
+`sounds.py` generates all four cues at run time (FR-27, FR-28); the repository
+contains no audio files.
+
+**Synthesis.** Each cue is a sum of decaying sine waves. The building blocks are
+a frequency, an exponential amplitude envelope with a short attack, an optional
+linear frequency sweep and an optional second harmonic. The commit cue mixes a
+second note a fifth above (`1.5 ×`) after a 55 ms delay, and its base pitch
+comes from a pentatonic table indexed by the slice number. Buffers are
+22.05 kHz mono 16-bit PCM WAV byte strings.
+
+| Cue | Length | Character |
+| --- | --- | --- |
+| open | 75 ms | 420 Hz blip with a rising sweep, soft attack |
+| hover | 28 ms | 1500 Hz tick with a fast decay |
+| commit | 200 ms | pentatonic note (392–880 Hz, one per slice) plus a fifth above |
+| cancel | 95 ms | 340 Hz tone sweeping downward |
+
+**Volume and caching.** Volume is quantised to 10 % steps and used both as the
+sample scale and as part of the cache key, so at most 11 buffers exist per
+(cue, slice) pair. `render_wav(cue, volume, index)` caches by
+`(cue, index % 8, volume step)`; repeated gestures reuse the same bytes, which
+is what keeps synthesis off the hot path (NFR-14). Playback is
+`winsound.PlaySound(data, SND_MEMORY | SND_ASYNC | SND_NODEFAULT)` and keeps the
+buffer referenced while it plays, so the GUI thread never blocks. `play()` never
+raises: if no audio device is available the exception is logged and the wheel
+keeps working.
+
+**Event mapping.** `PingApp` maps wheel events to cues: `begin` → `open`,
+`OverlayManager.hover_changed` → `hover`, `committed` → `commit` (with the
+sector index, which selects the note), `cancelled` → `cancel`. Each cue is
+checked against the master switch and its own per-cue flag before playback.
+
+**One-at-a-time limitation.** `winsound` keeps one asynchronous playback per
+process, so starting a new cue stops the previous one. For cues of 28–200 ms
+during a ~100 ms interaction this is an acceptable trade-off: a hover tick may
+truncate the fading tail of the open blip, which is inaudible in practice, and
+it buys a dependency-free implementation with no mixer, worker thread or extra
+Qt module (D17). It is documented as a design decision, not a defect.
 
 ## 8. Multi-monitor and DPI
 
@@ -358,7 +480,7 @@ expected results (`docs/04-test-plan.md`, TC-28 … TC-30).
 | `trigger_mouse_button` | str | `"left"` | left/right/middle/x1/x2 |
 | `wheel_radius` | int | 130 | 60–400 |
 | `dead_zone` | int | 34 | 5–(`wheel_radius`−20) |
-| `sector_count` | int | 8 | fixed in 0.2.0 |
+| `sector_count` | int | 8 | fixed in 0.3.0 |
 | `sectors` | list[str] | LoL-style names | length == `sector_count` |
 | `animation_tau` | float | 0.035 | 0.005–0.5 s |
 | `mark_duration_ms` | int | 900 | 300–4000 |
@@ -367,6 +489,15 @@ expected results (`docs/04-test-plan.md`, TC-28 … TC-30).
 | `start_with_windows` | bool | false | HKCU Run entry |
 | `show_labels` | bool | true | |
 | `theme` | str | `"gold"` | gold/blue/red |
+| `show_icons` | bool | true | |
+| `sector_icons` | list[str] | default icon per slice | any of the ten icon ids |
+| `sector_images` | list[str] | eight empty strings | PNG path or `""`, per slice |
+| `icon_size` | int | 30 | 12–64 px |
+| `sound_volume` | float | 0.5 | 0.0–1.0 (10 % steps) |
+| `sound_hover_ticks` | bool | true | |
+| `sound_on_open` | bool | true | |
+| `sound_on_commit` | bool | true | |
+| `sound_on_cancel` | bool | true | |
 
 ### 9.2 Repair-on-load, not fail-on-load
 
@@ -483,6 +614,9 @@ An honest measurement section has to name its own weaknesses:
 | D12 | JSONL logs | CSV, SQLite | Append-only, one write per event, no schema migration | Duplicated keys per line |
 | D13 | Config passed by reference to hooks | Global singleton | Testable construction, explicit dependencies | `rebind()` needed after settings change |
 | D14 | Stdlib `unittest` | pytest | Zero install required to verify the submission | No fixtures/parametrisation sugar |
+| D15 | Original vector icons over extracted game assets | Extracted or recoloured Riot ping art, an icon font, a third-party PNG pack | Riot artwork is copyrighted and the repository must ship no third-party media; `QPainterPath` geometry is original, resolution independent and tiny | About 300 lines of drawing code to maintain; icons are geometric rather than illustrated |
+| D16 | Synthesised audio over bundled samples | Bundled WAV/OGG samples, recorded tones | No licensing questions, no binary blobs, no asset loader in the frozen build; the cues are short and simple enough to generate | Less rich sound design; character limited to sine, envelope and sweep |
+| D17 | `winsound` over QtMultimedia | `QSoundEffect` from QtMultimedia | Avoids a whole Qt module in the frozen build and the associated PyInstaller plugins; standard library only, no thread management | One cue at a time, no mixing; Windows-only, which the project already is |
 
 ## 13. Limitations
 
@@ -495,7 +629,10 @@ Design-inherent, documented rather than hidden:
    for the duration of the wheel, and for the mark's fade).
 4. Mixed-DPI multi-monitor: correct on the active screen only.
 5. Windows only — `msvcrt`, `winreg`, `winsound` are used directly.
-6. Pause is manual; fullscreen-app auto-pause is not implemented in 0.2.0.
+6. Pause is manual; fullscreen-app auto-pause is not implemented in 0.3.0.
+7. Sound cues cannot overlap: `winsound` stops the previous asynchronous sound
+   when a new one starts. Documented as a trade-off; with 28–200 ms cues the
+   audible effect is negligible.
 
 ## 14. Future work
 
@@ -521,3 +658,5 @@ Ordered by value per effort:
 | NFR-01 … NFR-04 (latency, CPU, RAM, start) | §11, §7.1 | latency probe, `docs/04-test-plan.md` §5 |
 | NFR-05 … NFR-08 (no network, no game interaction, robustness) | §2, §10.3 | inspection + TC-27 |
 | NFR-09 … NFR-12 (portability, DPI, multi-monitor) | §8 | TC-28 … TC-30 |
+| FR-23 … FR-28 (icons, animations, sound) | §7.6, §7.7, §7.8 | TC-31 … TC-36 |
+| NFR-13, NFR-14 (icon frame cost, synthesis cost) | §7.6, §7.8 | frame-time and synthesis timing in `docs/04-test-plan.md` |

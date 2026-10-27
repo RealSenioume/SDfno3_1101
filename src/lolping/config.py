@@ -40,6 +40,20 @@ DEFAULT_SECTORS: tuple[str, ...] = (
     "Push",
 )
 
+#: Vector icon per slice, in the same order as DEFAULT_SECTORS. The ids are
+#: resolved by ``lolping.assets``; unknown ids fall back to a generic ring there,
+#: so this module stays free of Qt and of the icon registry.
+DEFAULT_SECTOR_ICONS: tuple[str, ...] = (
+    "on_my_way",
+    "all_in",
+    "assist",
+    "vision",
+    "missing",
+    "enemy_vision",
+    "retreat",
+    "push",
+)
+
 
 def app_data_dir() -> Path:
     """Return the per-user data directory, creating it if needed."""
@@ -85,6 +99,19 @@ class Config:
     show_labels: bool = True
     theme: str = "gold"
 
+    # ---- slice artwork (v0.3) ----
+    show_icons: bool = True
+    sector_icons: list[str] = field(default_factory=lambda: list(DEFAULT_SECTOR_ICONS))
+    sector_images: list[str] = field(default_factory=lambda: [""] * SECTOR_COUNT)
+    icon_size: int = 30
+
+    # ---- sound (v0.3) ----
+    sound_volume: float = 0.5
+    sound_hover_ticks: bool = True
+    sound_on_open: bool = True
+    sound_on_commit: bool = True
+    sound_on_cancel: bool = True
+
     # ---------------------------------------------------------------- mapping
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -123,6 +150,27 @@ class Config:
         )
         config.show_labels = _flag(data.get("show_labels"), config.show_labels)
         config.theme = _choice(data.get("theme"), THEMES, config.theme)
+
+        config.show_icons = _flag(data.get("show_icons"), config.show_icons)
+        config.sector_icons = _clean_icon_ids(
+            data.get("sector_icons"), DEFAULT_SECTOR_ICONS, SECTOR_COUNT
+        )
+        config.sector_images = _clean_paths(data.get("sector_images"), SECTOR_COUNT)
+        config.icon_size = int(_number(data.get("icon_size"), 12, 64, config.icon_size))
+
+        config.sound_volume = _number(
+            data.get("sound_volume"), 0.0, 1.0, config.sound_volume
+        )
+        config.sound_hover_ticks = _flag(
+            data.get("sound_hover_ticks"), config.sound_hover_ticks
+        )
+        config.sound_on_open = _flag(data.get("sound_on_open"), config.sound_on_open)
+        config.sound_on_commit = _flag(
+            data.get("sound_on_commit"), config.sound_on_commit
+        )
+        config.sound_on_cancel = _flag(
+            data.get("sound_on_cancel"), config.sound_on_cancel
+        )
         return config
 
     # ------------------------------------------------------------------- disk
@@ -212,3 +260,40 @@ def _clean_sectors(value: Any, count: int) -> list[str]:
     while len(names) < count:
         names.append(DEFAULT_SECTORS[len(names) % len(DEFAULT_SECTORS)])
     return names
+
+
+def _clean_icon_ids(
+    value: Any, defaults: tuple[str, ...], count: int
+) -> list[str]:
+    """Keep well-formed icon ids; unknown ids are left for assets.py to repair."""
+    ids: list[str] = []
+    if isinstance(value, (list, tuple)):
+        for item in value:
+            if isinstance(item, str):
+                token = item.strip().lower()
+                if token and len(token) <= 32:
+                    ids.append(token)
+                else:
+                    ids.append("")
+            else:
+                ids.append("")
+    ids = ids[:count]
+    while len(ids) < count:
+        index = len(ids)
+        ids.append(defaults[index] if index < len(defaults) else "generic")
+    for index, token in enumerate(ids):
+        if not token:
+            ids[index] = defaults[index] if index < len(defaults) else "generic"
+    return ids
+
+
+def _clean_paths(value: Any, count: int) -> list[str]:
+    """Keep image paths as strings; whether a file exists is decided at draw time."""
+    paths: list[str] = []
+    if isinstance(value, (list, tuple)):
+        for item in value:
+            paths.append(item.strip()[:260] if isinstance(item, str) else "")
+    paths = paths[:count]
+    while len(paths) < count:
+        paths.append("")
+    return paths

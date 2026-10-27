@@ -52,12 +52,25 @@ def _harden_console() -> None:
 
 
 def default_latency_path() -> Path:
-    """Return ``%APPDATA%\\lolping-desktop\\latency.jsonl`` (Windows) or a best guess."""
+    """Return ``%APPDATA%\\lolping-desktop\\latency.jsonl`` (Windows) or a best guess.
+
+    The folder name is owned by :mod:`lolping.config`; asking the package first
+    means this tool cannot drift out of sync with the application again. The
+    import is optional: the analyser still works as a standalone stdlib script
+    when the package is not on ``PYTHONPATH``.
+    """
+    try:
+        from lolping.config import latency_path as _app_latency_path
+
+        return _app_latency_path()
+    except Exception:  # pragma: no cover - standalone use without the package
+        pass
+
     preferred = os.environ.get("APPDATA")
     if preferred:
-        return Path(preferred) / "lolping" / "latency.jsonl"
+        return Path(preferred) / "lolping-desktop" / "latency.jsonl"
     # Non-Windows or a stripped environment: mirror the usual location.
-    return Path.home() / "AppData" / "Roaming" / "lolping" / "latency.jsonl"
+    return Path.home() / "AppData" / "Roaming" / "lolping-desktop" / "latency.jsonl"
 
 
 def _coerce_number(value: object) -> float | None:

@@ -35,6 +35,7 @@ from PyQt5.QtWidgets import (
     QWidget,
 )
 
+from .assets import ICON_IDS, resolve_icon
 from .config import DEFAULT_SECTORS, MODIFIER_NAMES, SECTOR_COUNT, THEMES, Config
 from .hotkeys import parse_hotkey
 
@@ -72,6 +73,10 @@ _TAU_MAX_MS = 200
 _MARK_MIN_MS = 300
 _MARK_MAX_MS = 4000
 _SECTOR_MAX_LEN = 24
+_ICON_SIZE_MIN = 12
+_ICON_SIZE_MAX = 64
+_VOLUME_MIN = 0
+_VOLUME_MAX = 100
 
 
 class SettingsDialog(QDialog):
@@ -82,10 +87,12 @@ class SettingsDialog(QDialog):
         self._base_config = config
         self._modifier_boxes: dict[str, QCheckBox] = {}
         self._sector_edits: list[QLineEdit] = []
+        self._sector_icon_combos: list[QComboBox] = []
+        self._icon_widgets: list[QWidget] = []
 
         self.setWindowTitle("lolping settings")
         self.setWindowFlag(Qt.WindowContextHelpButtonHint, False)
-        self.setFixedSize(640, 760)
+        self.setFixedSize(660, 840)
 
         self._build_ui()
         self._connect_signals()
@@ -121,10 +128,18 @@ class SettingsDialog(QDialog):
             animation_tau=round(self._tau_slider.value() / 1000.0, 3),
             mark_duration_ms=int(self._mark_spin.value()),
             sound_enabled=bool(self._sound_check.isChecked()),
+            sound_volume=round(self._volume_slider.value() / 100.0, 2),
+            sound_hover_ticks=bool(self._hover_ticks_check.isChecked()),
             quit_hotkey=self._hotkey_edit.text().strip().lower().replace(" ", ""),
             start_with_windows=bool(self._autostart_check.isChecked()),
             show_labels=bool(self._labels_check.isChecked()),
             theme=str(self._theme_combo.currentData() or self._base_config.theme),
+            show_icons=bool(self._icons_check.isChecked()),
+            sector_icons=[
+                str(combo.currentData() or resolve_icon(None, index))
+                for index, combo in enumerate(self._sector_icon_combos)
+            ],
+            icon_size=int(self._icon_size_slider.value()),
         )
 
     @staticmethod
@@ -243,29 +258,54 @@ class SettingsDialog(QDialog):
         for name in THEMES:
             self._theme_combo.addItem(THEME_LABELS.get(name, name.capitalize()), name)
         options_row.addWidget(self._theme_combo)
-        options_row.addSpacing(16)
-        self._labels_check = QCheckBox("Show sector labels", group)
+        options_row.addSpacing(12)
+        self._labels_check = QCheckBox("Show labels", group)
         options_row.addWidget(self._labels_check)
+        options_row.addSpacing(8)
+        self._icons_check = QCheckBox("Show icons", group)
+        self._icons_check.setToolTip("Draw a vector icon (or your own image) on every slice.")
+        options_row.addWidget(self._icons_check)
         options_row.addStretch(1)
         layout.addLayout(options_row)
+
+        self._icon_size_slider = QSlider(Qt.Horizontal, group)
+        self._icon_size_slider.setRange(_ICON_SIZE_MIN, _ICON_SIZE_MAX)
+        self._icon_size_slider.setPageStep(4)
+        self._icon_size_value = QLabel("", group)
+        self._icon_size_value.setMinimumWidth(60)
+        self._icon_size_value.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+        layout.addLayout(
+            self._slider_row(
+                "Icon size:", self._icon_size_slider, self._icon_size_value, group
+            )
+        )
         return group
 
     def _build_sectors_group(self, parent: QWidget) -> QGroupBox:
-        group = QGroupBox("Sector names", parent)
+        group = QGroupBox("Slices", parent)
         grid = QGridLayout(group)
-        grid.setHorizontalSpacing(8)
+        grid.setHorizontalSpacing(6)
         grid.setVerticalSpacing(6)
-        columns = 4
+        columns = 2
         for index in range(SECTOR_COUNT):
             edit = QLineEdit(group)
             edit.setMaxLength(_SECTOR_MAX_LEN)
             default = DEFAULT_SECTORS[index % len(DEFAULT_SECTORS)]
             edit.setPlaceholderText(default)
             self._sector_edits.append(edit)
+
+            combo = QComboBox(group)
+            combo.setToolTip(f"Icon for slice {index + 1}.")
+            for icon_id in ICON_IDS:
+                combo.addItem(icon_id.replace("_", " ").title(), icon_id)
+            combo.setMinimumWidth(112)
+            self._sector_icon_combos.append(combo)
+
             row = index // columns
-            column = (index % columns) * 2
+            column = (index % columns) * 3
             grid.addWidget(QLabel(f"{index + 1}.", group), row, column)
             grid.addWidget(edit, row, column + 1)
+            grid.addWidget(combo, row, column + 2)
             grid.setColumnStretch(column + 1, 1)
         return group
 
@@ -294,11 +334,29 @@ class SettingsDialog(QDialog):
         )
         self._mark_spin.setMinimumWidth(110)
         mark_row.addWidget(self._mark_spin)
-        mark_row.addStretch(1)
+        mark_row.addSpacing(10)
+        mark_row.addWidget(QLabel("Volume:", group))
+        self._volume_slider = QSlider(Qt.Horizontal, group)
+        self._volume_slider.setRange(_VOLUME_MIN, _VOLUME_MAX)
+        self._volume_slider.setPageStep(5)
+        self._volume_value = QLabel("", group)
+        self._volume_value.setMinimumWidth(50)
+        self._volume_value.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+        mark_row.addWidget(self._volume_slider, 1)
+        mark_row.addWidget(self._volume_value)
         layout.addLayout(mark_row)
 
-        self._sound_check = QCheckBox("Play a sound on ping", group)
-        layout.addWidget(self._sound_check)
+        sound_row = QHBoxLayout()
+        self._sound_check = QCheckBox("Enable sounds", group)
+        sound_row.addWidget(self._sound_check)
+        sound_row.addSpacing(12)
+        self._hover_ticks_check = QCheckBox("Hover ticks", group)
+        self._hover_ticks_check.setToolTip(
+            "Play a short tick when the highlighted slice changes."
+        )
+        sound_row.addWidget(self._hover_ticks_check)
+        sound_row.addStretch(1)
+        layout.addLayout(sound_row)
         return group
 
     def _build_system_group(self, parent: QWidget) -> QGroupBox:
@@ -333,18 +391,30 @@ class SettingsDialog(QDialog):
         return row
 
     def _connect_signals(self) -> None:
+        self._icon_widgets = [
+            self._icon_size_slider,
+            self._icon_size_value,
+            *self._sector_icon_combos,
+        ]
+
         self._radius_slider.valueChanged.connect(self._on_radius_changed)
         self._dead_slider.valueChanged.connect(self._on_dead_zone_changed)
         self._tau_slider.valueChanged.connect(self._on_tau_changed)
+        self._icon_size_slider.valueChanged.connect(self._on_icon_size_changed)
+        self._volume_slider.valueChanged.connect(self._on_volume_changed)
+        self._icons_check.toggled.connect(self._on_icons_toggled)
 
         for box in self._modifier_boxes.values():
             box.toggled.connect(self._clear_error)
         for edit in self._sector_edits:
             edit.textChanged.connect(self._clear_error)
+        for combo in self._sector_icon_combos:
+            combo.currentIndexChanged.connect(self._clear_error)
         self._hotkey_edit.textChanged.connect(self._clear_error)
         self._button_combo.currentIndexChanged.connect(self._clear_error)
         self._theme_combo.currentIndexChanged.connect(self._clear_error)
         self._sound_check.toggled.connect(self._clear_error)
+        self._hover_ticks_check.toggled.connect(self._clear_error)
         self._autostart_check.toggled.connect(self._clear_error)
         self._labels_check.toggled.connect(self._clear_error)
         self._mark_spin.valueChanged.connect(self._clear_error)
@@ -382,6 +452,18 @@ class SettingsDialog(QDialog):
         self._hotkey_edit.setText(str(config.quit_hotkey))
         self._autostart_check.setChecked(bool(config.start_with_windows))
         self._labels_check.setChecked(bool(config.show_labels))
+        self._icons_check.setChecked(bool(config.show_icons))
+
+        icon_size = min(max(int(config.icon_size), _ICON_SIZE_MIN), _ICON_SIZE_MAX)
+        self._icon_size_slider.setValue(icon_size)
+        for index, combo in enumerate(self._sector_icon_combos):
+            icon_id = resolve_icon(config.sector_icons, index)
+            position = combo.findData(icon_id)
+            combo.setCurrentIndex(position if position >= 0 else 0)
+
+        volume = int(round(float(config.sound_volume) * 100.0))
+        self._volume_slider.setValue(min(max(volume, _VOLUME_MIN), _VOLUME_MAX))
+        self._hover_ticks_check.setChecked(bool(config.sound_hover_ticks))
 
         theme_index = self._theme_combo.findData(config.theme)
         self._theme_combo.setCurrentIndex(theme_index if theme_index >= 0 else 0)
@@ -391,6 +473,9 @@ class SettingsDialog(QDialog):
         self._on_radius_changed(self._radius_slider.value())
         self._on_dead_zone_changed(self._dead_slider.value())
         self._on_tau_changed(self._tau_slider.value())
+        self._on_icon_size_changed(self._icon_size_slider.value())
+        self._on_volume_changed(self._volume_slider.value())
+        self._on_icons_toggled(self._icons_check.isChecked())
         self._clear_error()
 
     def _reset_to_defaults(self) -> None:
@@ -413,6 +498,19 @@ class SettingsDialog(QDialog):
 
     def _on_tau_changed(self, value: int) -> None:
         self._tau_value.setText(f"{int(value)} ms")
+        self._clear_error()
+
+    def _on_icon_size_changed(self, value: int) -> None:
+        self._icon_size_value.setText(f"{int(value)} px")
+        self._clear_error()
+
+    def _on_volume_changed(self, value: int) -> None:
+        self._volume_value.setText(f"{int(value)} %")
+        self._clear_error()
+
+    def _on_icons_toggled(self, checked: bool) -> None:
+        for widget in self._icon_widgets:
+            widget.setEnabled(bool(checked))
         self._clear_error()
 
     # ---------------------------------------------------------------- validation

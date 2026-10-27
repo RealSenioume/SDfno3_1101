@@ -1,15 +1,19 @@
-# 5. User manual — lolping v0.2.0
+# 5. User manual — lolping v0.3.0
 
 ## 5.1 What lolping is
 
-lolping is a Windows desktop tool that opens a radial menu of eight labels — a
-"ping wheel" in the style of League of Legends — at the mouse cursor. You hold
-a key combination, drag the mouse toward a label, and release. The wheel closes
-and the choice is written to a local log file.
+lolping is a Windows desktop tool that opens a radial menu of eight labelled,
+icon-bearing sectors — a "ping wheel" in the style of League of Legends — at the
+mouse cursor. You hold a key combination, drag the mouse toward a label, and
+release. The wheel closes, a short burst confirms the choice, and the choice is
+written to a local log file.
 
 lolping does not connect to League of Legends: it does not read game memory,
 does not use the Riot API and does not use the network. It only draws an overlay
 and records what you selected.
+
+All slice icons are original vector drawings and all sound cues are synthesised
+by the application at run time; no Riot Games artwork or audio is included.
 
 ## 5.2 Installation
 
@@ -52,10 +56,13 @@ it, click the small arrow in the tray to show hidden icons.
 ## 5.4 Sending a ping
 
 1. Hold **Alt** and press the **left mouse button** anywhere on the desktop.
-2. The wheel opens centred on the cursor. Drag away from the centre. The sector
-   under the cursor is emphasised and its name appears in the middle.
-3. Release the mouse button outside the dead zone to send the ping. A short
-   mark confirms it at the wheel centre and one line is added to `pings.jsonl`.
+2. The wheel opens centred on the cursor with a short scale-and-fade. Drag away
+   from the centre. The sector under the cursor is emphasised, its icon grows
+   and its name appears in the middle.
+3. Release the mouse button outside the dead zone to send the ping. A burst
+   (two rings, five streaks along the slice direction, an icon pop and the
+   name) confirms it at the wheel centre, and one line is added to
+   `pings.jsonl`.
 4. To cancel, do any of the following while the wheel is open:
    - release the mouse button within the dead zone (the inner circle,
      34 px by default);
@@ -106,9 +113,14 @@ Cancel discards them. **Reset to defaults** restores every value below.
 | Wheel radius | Slider | 130 | Outer radius of the wheel in logical pixels; 60 to 400. |
 | Dead zone | Slider | 34 | Radius of the inner circle in logical pixels; releasing inside it cancels. Range 5 to the wheel radius minus 20. |
 | Sector names | Eight text fields | On My Way … Push | The labels shown on the wheel and written to the log. Keep them short for legibility. |
+| Slice icons | One chooser per slice | arrow, double chevron, plus, eye, question mark, slashed eye, back arrow, push arrow | The vector icon for each slice. Ten ids are available: `on_my_way`, `all_in`, `assist`, `vision`, `missing`, `enemy_vision`, `retreat`, `push`, `danger`, `generic`. |
+| Show icons | Checkbox | On | Draws slice icons. Turning it off hides both the vector and custom icons and moves the rim labels inward. |
+| Icon size | Slider | 30 | Icon size in logical pixels; 12 to 64. |
 | Animation speed | Slider | 0.035 (`animation_tau`) | How quickly sectors and the wheel animate; lower values are snappier, higher values softer. Range 0.005 to 0.5. |
 | Mark duration | Slider | 900 ms | How long the confirmation mark stays visible after a commit; 300 to 4000 ms. |
-| Sound | Checkbox | Off | Plays a short cue when a ping is committed. Cancelling is always silent. |
+| Enable sounds | Checkbox | Off | Master switch for all sound cues. |
+| Volume | Slider | 50 % | Loudness of every cue; 0 % is silent. |
+| Hover ticks | Checkbox | On | Plays the short tick when the highlighted slice changes. |
 | Quit hotkey | Text field | Ctrl+Shift+Q | Global shortcut that closes lolping. Enter it with plus signs, for example `Ctrl+Shift+Q`. |
 | Start with Windows | Checkbox | Off | Registers lolping to start when you sign in to Windows. |
 | Theme | Drop-down | Gold | Palette of the wheel: gold, blue or red. |
@@ -119,7 +131,58 @@ If you want to edit settings without the interface, quit lolping and edit
 `%APPDATA%\lolping-desktop\config.json`. Unknown or invalid values are ignored and
 replaced by defaults the next time the file is loaded.
 
-## 5.7 Command line
+## 5.7 Custom slice icons
+
+The vector icons cover the common cases; if you want your own artwork on a
+slice, point its `sector_images` entry at a PNG file. The settings dialog edits
+the vector icon choice, not the PNG path, so this is a small `config.json` edit.
+
+1. Make or choose a square PNG, ideally 64 × 64 px. Larger images are scaled
+   down and transparency is supported; the image is clipped to a circle.
+2. Quit lolping so it cannot overwrite your edit when it saves settings.
+3. Open `%APPDATA%\lolping-desktop\config.json` in a text editor.
+4. Set the entry for the slice in `sector_images` (0–7, clockwise from
+   3 o'clock) to the full path of the file. Use doubled backslashes because the
+   file is JSON:
+
+   ```json
+   "sector_images": ["", "", "C:\\Users\\you\\Pictures\\assist.png", "", "", "", "", ""]
+   ```
+
+   This example replaces the icon of slice 2 (Assist Me).
+5. Start lolping and open the wheel. The PNG is drawn at the slice's icon
+   position, clipped to a circle, and is also used in the burst when that slice
+   is committed.
+6. To go back to the vector icon, set the entry to `""` again.
+
+Relative paths are resolved against lolping's working directory, so absolute
+paths are recommended. If a path is wrong, the file is unreadable or it is not
+an image, the slice falls back to its vector icon; nothing crashes and no slice
+is left blank. Custom images are only drawn while **Show icons** is ticked.
+
+## 5.8 Sound
+
+lolping can play four short cues, all generated by the application; no audio
+files are installed:
+
+| Cue | When it plays | Character |
+| --- | --- | --- |
+| Open | the wheel opens | short rising blip |
+| Hover | the highlighted slice changes | very short high tick |
+| Commit | a ping is committed | two-note chime; the pitch follows the slice |
+| Cancel | a gesture is cancelled | downward sweep |
+
+Sound is off by default. In Settings, **Enable sounds** is the master switch,
+**Volume** sets the loudness of all cues (0 % is silent), and **Hover ticks**
+switches only the hover cue; clearing it keeps the open, commit and cancel
+cues. The advanced keys `sound_on_open`, `sound_on_commit` and
+`sound_on_cancel` in `config.json` switch the other cues individually.
+
+The Windows `winsound` API plays one asynchronous cue at a time: starting a new
+cue stops the previous one. With cues of a few tens of milliseconds this is
+intentional and normally inaudible; it is not a fault.
+
+## 5.9 Command line
 
 ```text
 python -m lolping [--config PATH] [--latency-probe] [--debug] [--self-test]
@@ -132,10 +195,10 @@ python -m lolping [--config PATH] [--latency-probe] [--debug] [--self-test]
 | `--debug` | Writes more detailed diagnostic logging. Use it when reporting a problem. |
 | `--self-test` | Runs the built-in headless self-test (the wheel is exercised offscreen, a test ping is committed and `SELF-TEST OK` is printed) and exits. Useful after installation to check that the configuration and overlay can start. |
 
-## 5.8 Files and logs
+## 5.10 Files and logs
 
 All user data is stored in `%APPDATA%\lolping-desktop\` (normally
-`C:\Users\<you>\AppData\Roaming\lolping\`):
+`C:\Users\<you>\AppData\Roaming\lolping-desktop\`):
 
 | File | Contents |
 | --- | --- |
@@ -148,7 +211,7 @@ The files are plain text; you can open them in any editor, and you can delete
 them at any time. The ping log contains the names you pinged, the time and the
 screen position of each commit.
 
-## 5.9 Troubleshooting
+## 5.11 Troubleshooting
 
 | Problem | Cause and what to do |
 | --- | --- |
@@ -163,11 +226,13 @@ screen position of each commit.
 | The mouse or keyboard stops responding to lolping. | The input listener is supervised and restarted automatically. If it still fails (for example after a UAC prompt or sleep), quit and restart lolping. Security software that blocks global hooks may need lolping allow-listed. |
 | Settings do not survive a restart. | The config folder may not be writable, or `config.json` is corrupt and was replaced by defaults. Check the folder permissions; delete the file to start from defaults. |
 | The wheel opens on the wrong monitor or at the wrong size. | Open the wheel with the cursor on the intended monitor; scaling is read per monitor. If the problem persists, note your display layout, scaling percentages and monitor count when reporting it. |
-| No sound on commit. | Sound is off by default. Enable it in Settings and check the Windows volume mixer for the application. |
+| No sound at all. | Sound is off by default; enable it in Settings and set Volume above 0 %. Also check that Windows has an audio output device and that lolping is not muted in the Windows volume mixer. |
+| A slice shows the vector icon instead of my custom PNG. | The `sector_images` path is wrong, the file is not a readable PNG, or the index is not the slice you meant. Use a full absolute path with doubled backslashes in `config.json`; a broken path falls back to the vector icon by design. |
+| Sound cues cut each other off. | Windows `winsound` plays one asynchronous cue at a time: a new cue stops the previous one. This is a documented trade-off, not a fault. |
 | Higher CPU or memory use than expected. | Measure while idle with only the tray icon present; close other copies in Task Manager. Report the numbers from Task Manager if the values exceed the documented limits. |
 | Antivirus warns about a global keyboard hook. | Global input hooks are sometimes flagged heuristically. lolping is open source, uses no network and can be allow-listed; the warning is about the hook, not about modifying other programs. |
 
-## 5.10 Uninstalling
+## 5.12 Uninstalling
 
 1. Open the tray menu and choose **Settings…**; untick **Start with Windows**
    and press OK. Then choose **Quit**.
@@ -179,17 +244,18 @@ screen position of each commit.
    **Settings → Apps → Startup** (or Task Manager → Startup apps) and remove
    the lolping entry.
 
-## 5.11 Privacy
+## 5.13 Privacy
 
 lolping works entirely offline. It does not send telemetry, does not contact
 any server and does not access the game. The only data it writes is what is
-listed in section 5.8, and it stays on your machine.
+listed in section 5.10, and it stays on your machine.
 
-## 5.12 Known limitations
+## 5.14 Known limitations
 
 - Exclusive-fullscreen applications and elevated windows can prevent the
   overlay from appearing (see Troubleshooting).
-- lolping has eight fixed sectors in v0.2.0.
+- lolping has eight fixed sectors in v0.3.0.
+- Sound cues cannot overlap: a new cue stops the previous one (see section 5.8).
 - Windows 11 only.
 - It does not know about the game: the labels are generic and nothing is sent to
   teammates.

@@ -3,7 +3,7 @@
 **Course:** SD5913 — Semester 1
 **Author:** Zhexian Tao
 **Student repository:** <https://github.com/RealSenioume/SDfno3_1101>
-**Version described:** 0.2.0
+**Version described:** 0.3.0
 
 ---
 
@@ -20,10 +20,10 @@ application. It installs global keyboard and mouse hooks, draws a translucent
 always-on-top wheel centred on the pointer without stealing focus, animates the
 selection with frame-rate-independent exponential smoothing, leaves a fading
 mark where the ping was placed, and records every ping as JSON Lines. It is
-built from 13 modules totalling roughly 2,400 lines of Python, with 73
-automated unit tests covering the geometry, configuration-repair and
-input-state-machine logic, plus a packaging pipeline that produces a standalone
-executable.
+built from 14 modules totalling roughly 3,100 lines of Python, with 97
+automated unit tests covering the geometry, configuration-repair,
+input-state-machine, icon and audio logic, plus a packaging pipeline that
+produces a standalone executable.
 
 The project deliberately does **not** interact with the League of Legends
 client. That boundary removes any anti-cheat or terms-of-service exposure and
@@ -93,8 +93,9 @@ The objectives were:
 * A measurement methodology for trigger-to-first-paint latency that includes the
   cross-thread queue hop, together with an explicit statement of what it does
   *not* include.
-* An automated suite of 73 tests over the parts of the system most likely to be
-  wrong (angle conventions, hostile configuration, input state transitions).
+* An automated suite of 97 tests over the parts of the system most likely to be
+  wrong (angle conventions, hostile configuration, input state transitions, icon
+  fallbacks, audio buffers).
 
 ### 1.5 Report structure
 
@@ -133,7 +134,7 @@ The present project differs deliberately:
 | Input suppression | Helper swallows Alt+drag | Cannot suppress; documented limitation |
 | Platforms | Windows, macOS, experimental Linux | Windows only |
 | Extras | Rooms, emotes, updates, i18n | None — single-purpose |
-| Code size | Tens of thousands of lines | ~2,400 lines |
+| Code size | Tens of thousands of lines | ~3,100 lines |
 | Purpose | Product | Coursework artefact, built from scratch |
 
 Its published limitations corroborate two constraints found independently here:
@@ -392,18 +393,19 @@ Three failure modes received explicit design attention:
 
 | Module | Lines | Responsibility |
 | --- | --- | --- |
-| `geometry.py` | 111 | Sector hit testing, angles, easing |
-| `config.py` | 214 | Schema, repair, atomic persistence, paths |
-| `hotkeys.py` | 145 | Parse and format `"ctrl+shift+q"` |
-| `input_hook.py` | 346 | OS hooks, key normalisation, supervisor |
-| `overlay.py` | 796 | Per-screen windows, painting, marks |
-| `settings_dialog.py` | 459 | Settings UI with validation |
-| `app.py` | 502 | Bootstrap, tray, wiring, logs, CLI |
-| `single_instance.py` | 76 | File-lock instance guard |
-| `autostart.py` | 70 | `HKCU\...\Run` integration |
-| `sounds.py` | 58 | Synthesised asynchronous ping tone |
-| `logging_setup.py` | 71 | Rotating log, excepthook |
-| `__init__.py`, `__main__.py` | 31 | Package metadata and entry point |
+| `geometry.py` | 85 | Sector hit testing, angles, easing |
+| `config.py` | 251 | Schema, repair, atomic persistence, paths |
+| `hotkeys.py` | 124 | Parse and format `"ctrl+shift+q"` |
+| `assets.py` | 259 | Ten vector icons, pixmap cache, user PNG fallback |
+| `input_hook.py` | 302 | OS hooks, key normalisation, supervisor |
+| `overlay.py` | 867 | Per-screen windows, painting, wheel/burst animation |
+| `settings_dialog.py` | 483 | Settings UI with validation |
+| `app.py` | 444 | Bootstrap, tray, wiring, cue routing, logs, CLI |
+| `single_instance.py` | 63 | File-lock instance guard |
+| `autostart.py` | 57 | `HKCU\...\Run` integration |
+| `sounds.py` | 134 | Four synthesised cues, WAV cache, async playback |
+| `logging_setup.py` | 52 | Rotating log, excepthook |
+| `__init__.py`, `__main__.py` | 21 | Package metadata and entry point |
 
 ### 5.2 Input hook
 
@@ -444,7 +446,7 @@ kind of defect that would be hard to justify without a diagnosis.
 
 ### 5.4 Defects found by the test suite
 
-The 73 tests were not written after the fact; three real defects surfaced while
+The 97 tests were not written after the fact; three real defects surfaced while
 writing them:
 
 1. **Esc left the hook's `wheel_open` flag set**, so the next trigger could be
@@ -470,6 +472,46 @@ One packaging trap is documented in the spec: PyInstaller executes the entry
 script as a top-level module, where a relative import fails, so the build uses a
 generated stub that imports the package entry point.
 
+### 5.6 Slice artwork, animation and audio (v0.3.0)
+
+The first release drew only text labels on the slices. Version 0.3.0 adds the
+three things that make the wheel read as a finished tool rather than a diagram.
+
+**Original vector icons.** The obvious shortcut would have been to extract the
+in-game ping icons from a local installation, which is what the reference
+implementation's asset tool does. That was rejected for three reasons: the art is
+Riot Games' intellectual property and the repository is public; extracted assets
+break on every game patch; and binary art cannot be re-coloured or scaled without
+loss. Instead `assets.py` defines ten icons as `QPainterPath` geometry in a unit
+square, scaled by the painter at draw time. The same icon is therefore crisp at a
+24 px label and at a 96 px burst, and the theme colour can be applied at any
+alpha. Icons are cached as pixmaps keyed by (id, size, colour, device ratio), and
+the fallback chain is *unknown id → the slice's default icon → a generic ring*, so
+a hand-edited configuration can never produce an empty slice. Users who do want
+their own artwork can point `sector_images[i]` at a PNG; it is clipped to a circle
+so a rectangular image still reads as a slice icon, and a missing file silently
+falls back to the vector icon.
+
+**Layered animation.** Opening the wheel now scales it from 70 % to 100 % of its
+radius and fades it in over 130 ms with a cubic ease-out, which disguises the
+first-frame cost and gives the gesture a sense of arrival. Releasing replaced the
+single expanding ring with four layers that share one progress value: two
+staggered rings (the second starts at 14 % of the timeline), five short streaks
+that fly outward along the committed slice's direction at ±18° so the mark points
+where the user pointed, an icon pop driven by an overshoot curve, and the slice
+name above the burst with a dark halo for legibility over bright content.
+
+**Synthesised audio.** Four cues — open, hover tick, commit chime, cancel sweep —
+are generated as decaying sines with an optional frequency sweep and second
+harmonic, quantised to ten volume steps and cached as in-memory WAV buffers. The
+commit chime picks a note from a pentatonic scale by slice index, so the eight
+slices are audibly distinct without any of them sounding wrong together. No audio
+file ships, and no Riot audio is used. Playback goes through `winsound` rather
+than QtMultimedia, which keeps a large Qt module out of the frozen build at the
+cost of one limitation: `winsound` plays one asynchronous sound at a time, so a
+newer cue interrupts the previous one. For cues that last 30–200 ms this is
+inaudible in practice and is documented as a design decision rather than a defect.
+
 ---
 
 ## 6. Testing and evaluation
@@ -482,9 +524,12 @@ generated stub that imports the package entry point.
 | `test_config.py` | ~24 | Round-trip, hostile inputs, clamping, sector padding, atomic save, corrupt/missing file |
 | `test_hotkeys.py` | ~12 | Modifier aliases, canonical formatting, rejection of ambiguous combos |
 | `test_input_hook.py` | ~22 | Trigger, commit, cancels, quit hotkey, modifier edge cases, key tokens |
+| `test_assets.py` | ~14 | Icon registry and defaults, fallback chain, every icon paints pixels, pixmap cache, missing user image |
+| `test_sounds.py` | ~11 | WAV headers and lengths, volume scaling, silence at zero, per-slice pitch, cache, playback safety |
 
-Result: **73 tests, all passing** (`python -m unittest discover -s tests`), in
-about 20 ms, with no display and no hooks installed.
+Result: **97 tests, all passing** (`python -m unittest discover -s tests`), in
+about 60 ms, with no display and no hooks installed (the icon suite forces the
+offscreen Qt platform).
 
 Two further automated checks exist: `--self-test` drives one complete
 wheel-open/commit cycle offscreen and prints `SELF-TEST OK`, and
@@ -545,37 +590,44 @@ returns a pass/fail verdict against the 50 ms target.
 
 **Test conditions.** Windows 11 desktop session, Python 3.14.5, PyQt5 5.15.11, a
 single display running at a scaled logical resolution, with the reference
-implementation closed (Section 2.2) and no other hook-owning tool active. The 48
+implementation closed (Section 2.2) and no other hook-owning tool active. The 30
 gestures were issued by `tools/demo_gesture.py`, which sends the same
-Alt + press + drag + release sequence a human performs.
+Alt + press + drag + release sequence a human performs; the run used the v0.3.0
+build with slice icons enabled and the burst animation active.
 
 | Metric | n | min | median | p90 | p95 | p99 | max | Verdict |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |
-| `frame_ms` — all samples | 48 | 2.91 | 5.40 | 13.72 | 14.48 | 105.48 | 105.48 | PASS |
-| `frame_ms` — warm-up excluded | 47 | 2.91 | 5.40 | 13.10 | **13.81** | 15.47 | 15.47 | **PASS** |
-| `commit_ms` — button hold time, not latency | 48 | 73 | 137 | 1880 | 2958 | 4441 | 4441 | n/a |
+| `frame_ms` — all samples | 30 | 4.48 | 4.98 | 5.45 | 5.58 | 103.57 | 103.57 | PASS |
+| `frame_ms` — warm-up excluded | 29 | 4.48 | 4.97 | 5.45 | **5.49** | 5.58 | 5.58 | **PASS** |
+| `commit_ms` — button hold time, not latency | 30 | 606 | 620 | 656 | 671 | 672 | 672 | n/a |
 
 **Interpretation.**
 
-1. The steady-state p95 is **13.81 ms**, roughly 3.6 times under the 50 ms target
-   of NFR-01, with a median of 5.40 ms.
-2. Exactly one of the 48 samples exceeds 50 ms: 105.48 ms, on the first wheel of
+1. The steady-state p95 is **5.49 ms**, roughly nine times under the 50 ms target
+   of NFR-01, with a median of 4.97 ms and a spread of barely one millisecond
+   across the 29 steady samples (4.48–5.58 ms). The render path is therefore not
+   the bottleneck it was feared to be: drawing eight icons and a layered burst
+   sits well inside a single 60 Hz frame.
+2. Exactly one of the 30 samples exceeds 50 ms: 103.57 ms, on the first wheel of
    the session. The first paint of a translucent Qt window is where the font
-   database, the glyph cache and window composition are first touched; afterwards
-   the distribution is tight (maximum 15.47 ms). Both views are reported because
+   database, the glyph cache and window composition are first touched. The
+   v0.2.0 session measured 105.48 ms for the same first gesture, so this is a
+   reproducible warm-up cost rather than noise. Both views are reported because
    hiding the outlier and quoting it as typical would each be dishonest.
 3. Even adding one full 60 Hz frame (~16.7 ms) of compositor presentation to every
-   sample, the steady-state p95 stays near 30 ms and the requirement still holds.
-4. `commit_ms` is the time the button was held, not a latency. The 137 ms median
-   is a natural drag; the 4.4 s maximum corresponds to gestures deliberately held
-   while screenshots were captured. It is reported because the probe records it,
-   not because it says anything about responsiveness.
+   sample, the steady-state p95 stays near 22 ms and the requirement still holds.
+4. `commit_ms` is the time the button was held, not a latency. The 620 ms median
+   is the harness's own pause between press and release; it is reported because
+   the probe records it, not because it says anything about responsiveness.
+5. The v0.2.0 and v0.3.0 sessions are **not directly comparable**: the earlier run
+   mixed scripted gestures with manual ones held for screenshots, while this run
+   is uniformly scripted. No claim of an improvement across versions is made.
 
 **Data-collection caveat.** The harness anchors the gesture on an empty strip of
 the taskbar so that the swallowed click cannot activate another application.
 Because that anchor sits near the bottom screen edge, downward drags are clipped
-by the boundary and end inside the dead zone: of 47 completed gestures, 40
-committed and 7 cancelled. The latency metric is sampled at the first paint and
+by the boundary and end inside the dead zone, so the committed pings cluster in
+the horizontal slices. The latency metric is sampled at the first paint and
 therefore does not depend on which slice is chosen; the skew affects only the
 recorded sector distribution, not the measurement.
 
@@ -590,9 +642,9 @@ so they describe this configuration rather than all configurations.
 
 | Metric | Target | Measured | Verdict |
 | --- | --- | --- | --- |
-| Idle CPU, no wheel open | < 1 % | < 0.01 % (no CPU-time tick in a 10 s sample) | PASS |
-| Idle working set | < 120 MB | 41 MB | PASS |
-| Cold start, process spawn → tray ready | < 3 s | 0.42 s | PASS |
+| Idle CPU, no wheel open | < 1 % | 0.16 % of one core (10 s sample, tray resident) | PASS |
+| Idle working set | < 120 MB | 42 MB | PASS |
+| Cold start, process spawn → tray ready | < 3 s | 0.36 s | PASS |
 | Idle animation timers | 0 | 0 | PASS |
 
 Measurement method: the working set was read from the live process
@@ -606,8 +658,8 @@ process.
 
 The idle-timer row is a structural guarantee rather than an observation: the
 60 Hz timer is started only when a window is shown and stopped as soon as neither
-a wheel nor a mark needs drawing, so an idle lolping has no animation work
-scheduled at all. This is what makes the sub-0.01 % idle CPU figure possible.
+a wheel nor a mark needs drawing, so an idle lolping schedules no animation work
+at all. The 0.16 % residual is Qt's event loop and the tray icon, not rendering.
 
 ### 6.5 Discussion
 
@@ -668,8 +720,8 @@ keeps stale pixels, a control character that defeats a hotkey comparison, a
 mixed-DPI desktop that breaks the obvious window architecture, and a global hook
 that fails silently by design.
 
-The result is a 2,400-line Python application with a documented architecture,
-ten explicit design decisions with rejected alternatives, 73 automated tests, a
+The result is a 3,100-line Python application with a documented architecture,
+thirteen explicit design decisions with rejected alternatives, 97 automated tests, a
 formal manual test matrix, a packaging pipeline and a measured latency
 methodology. It honours every objective set out in Section 1.3: the gesture is
 reproduced, the tool is self-sufficient on a clean machine, the game client is
@@ -714,7 +766,7 @@ states what it cannot do is more trustworthy than one that does not.
 src/lolping/     13 modules: geometry, config, hotkeys, input_hook, overlay,
                  settings_dialog, app, single_instance, autostart, sounds,
                  logging_setup, __init__, __main__
-tests/           4 unittest suites, 73 tests
+tests/           6 unittest suites, 97 tests
 tools/           smoke_test.py, latency_report.py, demo_gesture.py
 build/           lolping.spec (PyInstaller), build.ps1
 docs/            00 module contract, 01 proposal, 02 requirements,

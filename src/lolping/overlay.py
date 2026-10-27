@@ -5,9 +5,11 @@ and drives it with global (logical pixel) cursor positions.  A window draws two
 things:
 
 * the wheel itself, eight pie sectors whose radius and colour follow a smoothed
-  per-sector weight (port of the accepted ``pingWheel_BETA`` prototype), and
-* the marks left behind by committed pings: an expanding ring, a dot and the
-  chosen sector name, fading out over ``config.mark_duration_ms``.
+  per-sector weight (port of the accepted ``pingWheel_BETA`` prototype), with
+  optional slice icons and a 0.13 s ease-out open animation, and
+* the burst left behind by a committed ping: two expanding rings, five
+  directional streaks, a popping slice icon and the sector name, fading out
+  over ``config.mark_duration_ms``.
 
 The module is presentation only: it never inspects the input devices.  ``app.py``
 turns hook events into ``begin_at`` / ``commit`` / ``cancel`` calls.
@@ -19,11 +21,12 @@ alive while a window is visible, so an idle overlay costs nothing.
 from __future__ import annotations
 
 import logging
+import math
 import time
 from dataclasses import dataclass
 from functools import partial
 
-from PyQt5.QtCore import QObject, QPoint, QPointF, QRect, Qt, QTimer, pyqtSignal
+from PyQt5.QtCore import QObject, QPoint, QPointF, QRect, QRectF, Qt, QTimer, pyqtSignal
 from PyQt5.QtGui import (
     QColor,
     QCursor,
@@ -31,14 +34,23 @@ from PyQt5.QtGui import (
     QFontMetrics,
     QGuiApplication,
     QPainter,
+    QPainterPath,
     QPaintEvent,
     QPen,
     QScreen,
 )
 from PyQt5.QtWidgets import QWidget
 
+from . import assets
 from .config import Config
-from .geometry import approach, clamp, sector_index, sector_label_point, sector_span
+from .geometry import (
+    approach,
+    clamp,
+    sector_center_angle,
+    sector_index,
+    sector_label_point,
+    sector_span,
+)
 
 log = logging.getLogger(__name__)
 
@@ -60,21 +72,40 @@ _GLOW_WIDTH = 12.0  # width of the translucent halo behind the hovered sector
 _CENTRE_RADIUS = 42.0
 _CENTRE_TEXT_WIDTH = 68.0
 _LABEL_RADIUS_FACTOR = 0.72
+_LABEL_RADIUS_WITH_ICONS = 0.80
 _LABEL_POINT_SIZE = 8
 _CENTRE_POINT_SIZE = 10
 _MARK_LABEL_POINT_SIZE = 9
 _MARK_LABEL_MAX_WIDTH = 160.0
 _MIN_POINT_SIZE = 6
 
+# --- v0.3 wheel open animation -------------------------------------------------
+_OPEN_DURATION = 0.13  # seconds from "invisible small wheel" to full size
+_OPEN_START_SCALE = 0.70  # sector radius at the first frame, as a fraction of R
+
+# --- v0.3 slice icons ----------------------------------------------------------
+_ICON_RADIUS_FACTOR = 0.60  # icon centre, as a fraction of the slice radius
+_ICON_HOVER_GROWTH = 0.10  # hovered icon is 10 % bigger
+_ICON_IDLE_COLOUR = (235, 235, 235)
+_ICON_IDLE_ALPHA = 200
+
+# --- v0.3 release burst --------------------------------------------------------
+_BURST_ANGLES = (-18.0, -9.0, 0.0, 9.0, 18.0)  # degrees around the slice centre
+_BURST_START_RADIUS = 46.0
+_BURST_MAX_RADIUS = 92.0
+_BURST_LINE_LENGTH = 26.0
+_BURST_LINE_ALPHA = 220
+
 
 @dataclass
 class _Mark:
-    """One fading ping mark painted in a window."""
+    """One burst left behind by a committed ping."""
 
     name: str
     pos: QPoint
     start: float
     duration: float
+    sector: int = -1
 
 
 class OverlayWindow(QWidget):
@@ -87,6 +118,7 @@ class OverlayWindow(QWidget):
 
     committed = pyqtSignal(str)  # sector name
     cancelled = pyqtSignal()
+    hover_changed = pyqtSignal(int)  # hovered slice index, -1 in the dead zone
 
     def __init__(self, screen: QScreen, config: Config, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -100,6 +132,7 @@ class OverlayWindow(QWidget):
         self._open = False
         self._marks: list[_Mark] = []
         self._last_tick = time.perf_counter()
+        self._opened_at = 0.0
 
         self._setup_window()
 
@@ -197,6 +230,7 @@ class OverlayWindow(QWidget):
         self._hover = -1
         self._weights = [0.0] * self._count
         self._last_tick = time.perf_counter()
+        self._opened_at = self._last_tick  # drives the 0.13 s open animation
 
         # Show without activating: no showNormal/activateWindow/focus call here.
         self.show()
@@ -233,9 +267,9 @@ class OverlayWindow(QWidget):
         name = self._sector_name(index)
         centre = QPoint(self._center)
 
-        # Drop the mark first so the window stays busy animating it, then clear
+        # Drop the burst first so the window stays busy animating it, then clear
         # the wheel state and repaint once so the wheel vanishes immediately.
-        self.add_mark(name, centre)
+        self.add_mark(name, centre, index)
         self._open = False
         self._hover = -1
         self._weights = [0.0] * self._count
@@ -243,8 +277,13 @@ class OverlayWindow(QWidget):
         self.committed.emit(name)
         return name
 
-    def add_mark(self, name: str, global_pos: QPoint) -> None:
-        """Animate a ping mark at ``global_pos`` (used by ``commit``)."""
+    def add_mark(self, name: str, global_pos: QPoint, sector: int = -1) -> None:
+        """Animate a ping burst at ``global_pos``.
+
+        ``sector`` is the committed slice index (used for the directional
+        streaks and the icon pop); it is optional so callers from v0.2 that pass
+        only ``(name, global_pos)`` keep working.
+        """
         duration = max(0.05, float(self._config.mark_duration_ms) / 1000.0)
         self._marks.append(
             _Mark(
@@ -252,6 +291,7 @@ class OverlayWindow(QWidget):
                 pos=QPoint(global_pos),
                 start=time.perf_counter(),
                 duration=duration,
+                sector=int(sector),
             )
         )
         self._apply_geometry()
@@ -283,7 +323,11 @@ class OverlayWindow(QWidget):
         self._apply_geometry()
 
         if self._open:
-            self._hover = self._hovered_sector()
+            hover = self._hovered_sector()
+            if hover != self._hover:
+                self._hover = hover
+                # Sound layer in app.py listens to this; emit only on changes.
+                self.hover_changed.emit(hover)
             tau = max(float(self._config.animation_tau), 0.001)
             weights = self._weights
             for index in range(self._count):
@@ -385,6 +429,78 @@ class OverlayWindow(QWidget):
         r = max(1, int(round(radius)))
         return QRect(int(round(cx)) - r, int(round(cy)) - r, r * 2, r * 2)
 
+    # ------------------------------------------------- v0.3 animation/icon aids
+    def _open_ease(self, now: float) -> float:
+        """Ease-out progress of the wheel open animation, in ``[0, 1]``."""
+        if not self._open:
+            return 1.0
+        progress = clamp((now - self._opened_at) / _OPEN_DURATION, 0.0, 1.0)
+        return 1.0 - (1.0 - progress) ** 3
+
+    @staticmethod
+    def _ease_out_back(progress: float) -> float:
+        """Overshooting ease-out used by the icon pop (peaks near 1.1)."""
+        c1 = 1.70158
+        c3 = c1 + 1.0
+        shifted = progress - 1.0
+        return 1.0 + c3 * shifted**3 + c1 * shifted**2
+
+    def _device_pixel_ratio(self) -> float:
+        try:
+            return float(self.devicePixelRatioF())
+        except AttributeError:  # pragma: no cover - Qt < 5.6
+            return 1.0
+
+    def _draw_slice_icon(
+        self,
+        painter: QPainter,
+        index: int,
+        cx: float,
+        cy: float,
+        size: float,
+        colour: QColor,
+        opacity: float = 1.0,
+    ) -> None:
+        """Draw slice ``index``'s user image or vector icon, centred and masked.
+
+        A user-supplied image is clipped to a circle so a rectangular PNG still
+        reads as a slice icon; a missing or broken image falls back to the
+        vector icon from :mod:`lolping.assets`.
+        """
+        if size < 1.0:
+            return
+
+        config = self._config
+        images = config.sector_images or []
+        path = str(images[index]).strip() if 0 <= index < len(images) else ""
+        if path:
+            pixmap = assets.load_pixmap(
+                path, max(1, int(round(size))), self._device_pixel_ratio()
+            )
+            if pixmap is not None and not pixmap.isNull():
+                ratio = float(pixmap.devicePixelRatio()) or 1.0
+                width = pixmap.width() / ratio
+                height = pixmap.height() / ratio
+                painter.save()
+                try:
+                    painter.setOpacity(clamp(opacity, 0.0, 1.0))
+                    clip = QPainterPath()
+                    clip.addEllipse(QRectF(cx - size / 2.0, cy - size / 2.0, size, size))
+                    painter.setClipPath(clip)
+                    painter.drawPixmap(
+                        QPointF(cx - width / 2.0, cy - height / 2.0), pixmap
+                    )
+                finally:
+                    painter.restore()
+                return
+
+        assets.draw_icon(
+            painter,
+            assets.resolve_icon(config.sector_icons, index),
+            QRectF(cx - size / 2.0, cy - size / 2.0, size, size),
+            colour,
+        )
+
     # ------------------------------------------------------------------- paint
     def paintEvent(self, event: QPaintEvent) -> None:  # noqa: N802 - Qt name
         painter = QPainter(self)
@@ -397,26 +513,32 @@ class OverlayWindow(QWidget):
             painter.fillRect(self.rect(), QColor(0, 0, 0, 0))
             painter.setCompositionMode(QPainter.CompositionMode_SourceOver)
 
+            now = time.perf_counter()
             if self._open:
-                self._paint_wheel(painter)
+                self._paint_wheel(painter, now)
             if self._marks:
-                now = time.perf_counter()
                 for mark in self._marks:
                     self._paint_mark(painter, mark, now)
         finally:
             painter.end()
 
-    def _paint_wheel(self, painter: QPainter) -> None:
+    def _paint_wheel(self, painter: QPainter, now: float) -> None:
         config = self._config
         count = self._count
         centre = self.mapFromGlobal(self._center)
         cx = float(centre.x())
         cy = float(centre.y())
+        ease = self._open_ease(now)
         base_radius = max(20.0, float(config.wheel_radius))
         accent = self._accent()
         gray = (60.0, 60.0, 60.0)
         weights = self._weights
-        radii = [base_radius + _RADIUS_GROWTH * weights[i] for i in range(count)]
+        # Open animation: grow from 70 % to 100 % of the radius and fade in.
+        radius_scale = _OPEN_START_SCALE + (1.0 - _OPEN_START_SCALE) * ease
+        radii = [
+            (base_radius + _RADIUS_GROWTH * weights[index]) * radius_scale
+            for index in range(count)
+        ]
 
         # 1) Translucent glow pass behind every visible sector.
         painter.setPen(Qt.NoPen)
@@ -427,7 +549,7 @@ class OverlayWindow(QWidget):
             radius = radii[index] + _GLOW_WIDTH
             start16, span16 = self._sector_arc(index)
             glow = QColor(accent)
-            glow.setAlpha(int(round(90 * weight)))
+            glow.setAlpha(int(round(90 * weight * ease)))
             painter.setBrush(glow)
             painter.drawPie(self._pie_rect(cx, cy, radius), start16, span16)
 
@@ -442,24 +564,49 @@ class OverlayWindow(QWidget):
                 int(round(gray[1] + (accent.green() - gray[1]) * weight)),
                 int(round(gray[2] + (accent.blue() - gray[2]) * weight)),
             )
-            fill.setAlpha(int(round(110 + (240 - 110) * weight)))
+            fill.setAlpha(int(round((110 + (240 - 110) * weight) * ease)))
 
             pen_colour = QColor(255, 255, 255)
-            pen_colour.setAlpha(int(round(80 + (255 - 80) * weight)))
+            pen_colour.setAlpha(int(round((80 + (255 - 80) * weight) * ease)))
 
             painter.setBrush(fill)
             painter.setPen(QPen(pen_colour, 1.0 + 2.0 * weight))
             painter.drawPie(self._pie_rect(cx, cy, radius), start16, span16)
 
-        # 3) Sector labels: only once the cursor leaves the dead zone, so the
-        #    first moment of the wheel stays uncluttered.
+        # 3) Slice icons on the 0.60 R circle, when enabled.
+        if config.show_icons:
+            icon_base = float(config.icon_size)
+            for index in range(count):
+                weight = weights[index]
+                size = icon_base * (1.0 + _ICON_HOVER_GROWTH * weight) * ease
+                if size < 1.0:
+                    continue
+                angle = math.radians(sector_center_angle(index, count))
+                icon_radius = radii[index] * _ICON_RADIUS_FACTOR
+                icon_x = cx + icon_radius * math.cos(angle)
+                icon_y = cy + icon_radius * math.sin(angle)
+                if weight > 0.5:
+                    colour = QColor(accent)
+                    colour.setAlpha(int(round(255 * ease)))
+                else:
+                    colour = QColor(*_ICON_IDLE_COLOUR)
+                    colour.setAlpha(int(round(_ICON_IDLE_ALPHA * ease)))
+                self._draw_slice_icon(painter, index, icon_x, icon_y, size, colour, ease)
+
+        # 4) Sector labels, pushed outwards when the icons claim the inner ring.
+        #    Hidden while the cursor sits in the dead zone.
         if config.show_labels and 0 <= self._hover < count:
+            label_factor = (
+                _LABEL_RADIUS_WITH_ICONS if config.show_icons else _LABEL_RADIUS_FACTOR
+            )
             for index in range(count):
                 label_x, label_y = sector_label_point(
-                    cx, cy, index, radii[index] * _LABEL_RADIUS_FACTOR, count
+                    cx, cy, index, radii[index] * label_factor, count
                 )
                 colour = QColor(255, 255, 255)
-                colour.setAlpha(255 if index == self._hover else 190)
+                colour.setAlpha(
+                    int(round((255 if index == self._hover else 190) * ease))
+                )
                 max_width = max(28.0, radii[index] * 0.60)
                 self._draw_centred_text(
                     painter,
@@ -471,13 +618,16 @@ class OverlayWindow(QWidget):
                     colour,
                 )
 
-        # 4) Dark centre disc with the current sector name.
-        painter.setBrush(QColor(30, 30, 30, 230))
-        painter.setPen(QPen(QColor(255, 255, 255), 2.0))
+        # 5) Dark centre disc with the current sector name. It fades to 25 % of
+        #    its alpha instead of zero so the wheel never blinks out completely.
+        disc = max(0.25, ease)
+        painter.setBrush(QColor(30, 30, 30, int(round(230 * disc))))
+        painter.setPen(QPen(QColor(255, 255, 255, int(round(255 * disc))), 2.0))
         painter.drawEllipse(QPointF(cx, cy), _CENTRE_RADIUS, _CENTRE_RADIUS)
 
         text = self._sector_name(self._hover) if self._hover >= 0 else "Caution"
         text_colour = QColor(255, 255, 255) if self._hover < 0 else QColor(accent)
+        text_colour.setAlpha(int(round(255 * disc)))
         self._draw_centred_text(
             painter,
             text,
@@ -492,47 +642,79 @@ class OverlayWindow(QWidget):
         elapsed = now - mark.start
         duration = max(mark.duration, 0.001)
         progress = clamp(elapsed / duration, 0.0, 1.0)
-        fade = 1.0 - progress
-        if fade <= 0.0:
+        if progress >= 1.0:
             return
 
         point = self.mapFromGlobal(mark.pos)
         px = float(point.x())
         py = float(point.y())
         accent = self._accent()
-        eased = 1.0 - (1.0 - progress) ** 2
+        outer_radius = 18.0
 
-        # Expanding ring.
-        ring_radius = 20.0 + 70.0 * eased
-        ring_colour = QColor(accent)
-        ring_colour.setAlpha(int(round(235 * fade)))
-        painter.setBrush(Qt.NoBrush)
-        painter.setPen(QPen(ring_colour, max(1.0, 4.0 * fade)))
-        painter.drawEllipse(QPointF(px, py), ring_radius, ring_radius)
+        # a) Two expanding rings, the second one slightly delayed.
+        for delay in (0.0, 0.14):
+            if progress < delay:
+                continue
+            window = max(0.001, 1.0 - delay)
+            local = clamp((progress - delay) / window, 0.0, 1.0)
+            radius = 18.0 + 78.0 * (1.0 - (1.0 - local) ** 2)
+            outer_radius = max(outer_radius, radius)
+            ring_colour = QColor(accent)
+            ring_colour.setAlpha(int(round(235 * (1.0 - local))))
+            painter.setBrush(Qt.NoBrush)
+            painter.setPen(QPen(ring_colour, 4.0 - 3.0 * local))
+            painter.drawEllipse(QPointF(px, py), radius, radius)
 
-        # Dot in the middle.
-        dot_colour = QColor(accent)
-        dot_colour.setAlpha(int(round(255 * fade)))
-        painter.setBrush(dot_colour)
-        painter.setPen(Qt.NoPen)
-        dot_radius = 8.0 * (1.0 - 0.4 * progress)
-        painter.drawEllipse(QPointF(px, py), dot_radius, dot_radius)
+        # b) Five short streaks flying outwards along the committed slice.
+        if mark.sector >= 0:
+            flight = clamp((progress - 0.05) / 0.50, 0.0, 1.0)
+            if progress >= 0.05 and flight < 1.0:
+                eased = 1.0 - (1.0 - flight) ** 2
+                inner = _BURST_START_RADIUS + (
+                    _BURST_MAX_RADIUS - _BURST_LINE_LENGTH - _BURST_START_RADIUS
+                ) * eased
+                inner = min(inner, _BURST_MAX_RADIUS - _BURST_LINE_LENGTH)
+                outer = min(_BURST_MAX_RADIUS, inner + _BURST_LINE_LENGTH)
+                streak_colour = QColor(accent)
+                streak_colour.setAlpha(int(round(_BURST_LINE_ALPHA * (1.0 - flight))))
+                painter.setPen(QPen(streak_colour, 3.0, Qt.SolidLine, Qt.RoundCap))
+                centre_angle = sector_center_angle(mark.sector, self._count)
+                for offset in _BURST_ANGLES:
+                    angle = math.radians(centre_angle + offset)
+                    cos_angle = math.cos(angle)
+                    sin_angle = math.sin(angle)
+                    painter.drawLine(
+                        QPointF(px + cos_angle * inner, py + sin_angle * inner),
+                        QPointF(px + cos_angle * outer, py + sin_angle * outer),
+                    )
 
-        # Name above the ring, with a cheap dark halo so it reads on any game.
-        if fade > 0.08 and mark.name:
+        # c) The committed slice icon pops at the centre, then fades out.
+        tail = clamp((1.0 - progress) / 0.40, 0.0, 1.0)
+        if mark.sector >= 0 and tail > 0.01:
+            pop = min(1.12, max(0.0, self._ease_out_back(clamp(progress / 0.30, 0.0, 1.0))))
+            icon_size = float(self._config.icon_size) * pop
+            if icon_size >= 1.0:
+                icon_colour = QColor(accent)
+                icon_colour.setAlpha(int(round(255 * tail)))
+                self._draw_slice_icon(
+                    painter, mark.sector, px, py, icon_size, icon_colour, tail
+                )
+
+        # d) Name above the outer ring, fading with the same tail.
+        if mark.name and tail > 0.02:
             font, metrics = self._fitted_font(
                 painter, mark.name, _MARK_LABEL_POINT_SIZE, _MARK_LABEL_MAX_WIDTH
             )
             width = metrics.horizontalAdvance(mark.name)
-            baseline = py - ring_radius - 14.0 + metrics.ascent() / 2.0
+            baseline = py - outer_radius - 14.0 + metrics.ascent() / 2.0
             left = px - width / 2.0
             painter.setFont(font)
-            halo = QColor(0, 0, 0, int(round(170 * fade)))
+            halo = QColor(0, 0, 0, int(round(170 * tail)))
             painter.setPen(halo)
             for offset_x, offset_y in ((-1, 0), (1, 0), (0, -1), (0, 1)):
                 painter.drawText(QPointF(left + offset_x, baseline + offset_y), mark.name)
             label = QColor(255, 255, 255)
-            label.setAlpha(int(round(255 * fade)))
+            label.setAlpha(int(round(255 * tail)))
             painter.setPen(label)
             painter.drawText(QPointF(left, baseline), mark.name)
 
@@ -572,6 +754,7 @@ class OverlayManager(QObject):
     """Owns one ``OverlayWindow`` per screen and relays its public signals."""
 
     committed = pyqtSignal(str, object)  # (sector name, global QPoint centre)
+    hover_changed = pyqtSignal(int)  # hovered slice index of the active wheel
 
     def __init__(self, config: Config, parent: QObject | None = None) -> None:
         # app.py passes its controller (a plain object) as parent in one place;
@@ -750,6 +933,7 @@ class OverlayManager(QObject):
         window = OverlayWindow(screen, self._config)
         window.committed.connect(partial(self._relay_committed, window))
         window.cancelled.connect(self._clear_active)
+        window.hover_changed.connect(partial(self._relay_hover, window))
         self._windows[key] = window
         log.debug("created overlay window for screen %r", key[0])
         return window
@@ -760,6 +944,11 @@ class OverlayManager(QObject):
         if self._active is window:
             self._active = None
         self.committed.emit(str(name), centre)
+
+    def _relay_hover(self, window: OverlayWindow, hover: int) -> None:
+        """Only the wheel that is currently open may drive the hover signal."""
+        if self._active is window and window.is_open():
+            self.hover_changed.emit(int(hover))
 
     def _clear_active(self) -> None:
         active = self._active

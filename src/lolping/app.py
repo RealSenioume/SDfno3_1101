@@ -36,7 +36,7 @@ from PyQt5.QtWidgets import (
     QSystemTrayIcon,
 )
 
-from . import __version__, autostart, sounds
+from . import __version__, assets, autostart, sounds
 from .config import Config, app_data_dir, latency_path, log_path
 from .hotkeys import format_hotkey
 from .input_hook import InputBridge, InputHook
@@ -215,6 +215,26 @@ class PingApp:
         self._bridge.quit_requested.connect(self.quit)
         self._bridge.health_changed.connect(self._on_health)
         self._overlay.committed.connect(self._on_committed)
+        self._overlay.hover_changed.connect(self._on_hover_changed)
+
+    # ----------------------------------------------------------------- sound
+    def _play(self, cue: str, index: int = 0) -> None:
+        """Play one cue if sound is on and that cue is individually enabled."""
+        config = self._config
+        if not config.sound_enabled:
+            return
+        enabled = {
+            "open": config.sound_on_open,
+            "hover": config.sound_hover_ticks,
+            "commit": config.sound_on_commit,
+            "cancel": config.sound_on_cancel,
+        }.get(cue, True)
+        if enabled:
+            sounds.play(cue, config.sound_volume, index)
+
+    def _on_hover_changed(self, index: int) -> None:
+        if index >= 0:
+            self._play("hover", index)
 
     def _on_trigger_down(self, x: int, y: int, pressed_at: float) -> None:
         if self._paused:
@@ -227,6 +247,7 @@ class PingApp:
         self._watcher.arm(self._on_first_frame)
         log.debug("trigger at (%s, %s)", x, y)
         self._overlay.begin_at(self._wheel_centre)
+        self._play("open")
 
     def _on_first_frame(self, painted_at: float) -> None:
         if self._t_down:
@@ -247,17 +268,19 @@ class PingApp:
         if self._overlay.is_open():
             self._watcher.disarm()
             self._overlay.cancel()
+            self._play("cancel")
 
     def _on_other_click(self, x: int, y: int) -> None:
         if self._overlay.is_open():
             log.debug("wheel cancelled by an extra click at (%s, %s)", x, y)
             self._watcher.disarm()
             self._overlay.cancel()
+            self._play("cancel")
 
     def _on_committed(self, name: str, position: object) -> None:
         point = position if isinstance(position, QPoint) else self._wheel_centre
         log.info("ping: %s at (%s, %s)", name, point.x(), point.y())
-        sounds.play_ping(self._config.sound_enabled)
+        self._play("commit", self._sector_index(name))
         self._append_ping(name, point)
         if self._tray.isVisible():
             self._tray.setToolTip(f"lolping \u2014 last ping: {name}")
@@ -375,6 +398,8 @@ class PingApp:
             self._tray.showMessage(
                 "lolping", "Settings could not be saved to disk.", QSystemTrayIcon.Warning, 5000
             )
+        # Pixmaps cache the old accent colour and icon size.
+        assets.clear_caches()
         self._overlay.set_config(edited)
         self._hook.rebind(edited)
         self._tray.setToolTip(self._tooltip_text())

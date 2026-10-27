@@ -29,3 +29,6 @@ Due to pynput's support for keyboard event suppression on Windows but not for mo
 For more details during development, check out the docs.
 
 - 10.24.2026
+
+# V.0.3.0 Update
+Now it has animations and sound effects that can be used for demonstrations. However, to avoid potential copyright issues, animations, textures, sound effects, and other related content are all generated using DSH (DeepSeek Harness).
