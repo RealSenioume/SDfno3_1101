@@ -34,9 +34,14 @@ For more details during development, check out the docs.
 
 - 10.24.2026
 
-# V.0.3.0 Update
+# V 0.3.0 Update
 - Now it has animations and sound effects that can be used for demonstrations. However, to avoid potential copyright issues, animations, textures, sound effects, and other related content are all generated using DSH (DeepSeek Harness).
 
 - By the way, I adjusted the temporary storage path left in the document when DSH runs locally.
+
+- 10.27.2026
+
+# V 0.3.1 Update
+- Now, trigger gesture will not affect other object, icon, etc on the windows.
 
 - 10.27.2026
