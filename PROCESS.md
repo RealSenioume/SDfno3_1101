@@ -23,7 +23,7 @@ Meanwhile, I noticed a bug: sometimes the wheel appears one frame in the previou
 # BETA v01_01
 - This is not a bug in the drawing logic, but a timing issue with the display of the Windows Composer (DWM).
 
-- self.show() will make the window "visible" first, and then Qt will dispatch the paintEvent. Between these two events, there is a short period of time where the window displays the previous backing store content (the roulette wheel in its old position), and then the new frame will overwrite it. You first change self.center in start_at(), and then call show(), but show() does not guarantee synchronous redrawing, so the old content will leak out for 1 frame.
+- self.show() will make the window "visible" first, and then Qt will dispatch the paintEvent. Between these two events, there is a short period of time where the window displays the previous backing store content (the roulette wheel in its old position), and then the new frame will overwrite it. I first change self.center in start_at(), and then call show(), but show() does not guarantee synchronous redrawing, so the old content will leak out for 1 frame.
 
 - At meantime, I asked Deepseek WEB to add one more function - when the wheel is aweak, mouse stop interactive with other thing. However, this version that Deepseek provided didn't work.
 
@@ -61,5 +61,12 @@ For more details during development, check out the docs.
 - Moved the data folder from %APPDATA%\lolping to %APPDATA%\lolping-desktop, because the installed reference app already owns the old folder name. Also rewrote the README quick start: no hard-coded local path any more, and it now includes the PYTHONPATH step that the old one was missing (the old instructions actually did not run).
 
 - Version strings in the docs were a mess (some still said 0.2.0), so everything now says 0.3.1. Unit tests: 134, all passing.
+
+- 10.27.2026
+
+# The importance of information synchronization!!!
+
+- Some additional content that I want to roast, there are some restricted content (such as some specific files that can only be modified through me) or content that has undergone additional manual modification. 
+- If these are not raised or synchronized with DSH at the beginning, DSH may perform overwrite operations during subsequent intervention. And these inconspicuous behaviors, if not intervened in a timely manner, may gradually accumulate into the "code mountain of sh*t" that we often mention.
 
 - 10.27.2026

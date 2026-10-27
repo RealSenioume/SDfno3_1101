@@ -145,5 +145,6 @@ MIT 许可证。见仓库根目录的 `LICENSE` 文件。
 
 ## Riot Games 免责声明
 
-该 lolping 未获得 Riot Games 的认可，也不代表 Riot Games 或任何正式参与制作或管理
-《英雄联盟》的人士的观点或意见。《英雄联盟》与 Riot Games 是 Riot Games, Inc. 的商标或注册商标。
+此 lolping 未获得 Riot Games 的认可，也不代表 Riot Games 或任何正式参与制作或管理
+《英雄联盟》的人士的观点或意见。《英雄联盟》与 Riot Games 是 Riot Games, Inc. 的商标
+或注册商标。
