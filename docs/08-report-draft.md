@@ -517,6 +517,25 @@ expected results rather than defects.
 | TC-28 | Exclusive-fullscreen game | **Expected failure** — overlay hidden |
 | TC-30 | Elevated window underneath | **Expected failure** — overlay hidden |
 
+Figures 1–3 were captured on the target machine during the measurement session.
+
+![Figure 1: the wheel mid-gesture](figures/fig1-wheel.png)
+
+*Figure 1 — the wheel open at the pointer with the "Enemy Missing" slice
+highlighted: eight labelled slices, a gold glow on the hovered slice, and the
+centre disc repeating the current selection.*
+
+![Figure 2: the mark left after release](figures/fig2-mark.png)
+
+*Figure 2 — the mark left on screen after release: an expanding ring, a dot
+anchoring the exact point, and the slice name drawn above it with a dark halo so
+it stays legible over bright desktop content.*
+
+![Figure 3: the settings window](figures/fig3-settings.png)
+
+*Figure 3 — the settings window: trigger, wheel, slices, feedback and system
+groups, with validation errors shown inline.*
+
 ### 6.3 Latency measurement
 
 `--latency-probe` records, per gesture, `frame_ms` (mouse-down hook timestamp →
@@ -524,10 +543,41 @@ first paint of the overlay window) and `commit_ms` (mouse-down → mouse-up).
 `tools/latency_report.py` computes n / min / median / p90 / p95 / p99 / max and
 returns a pass/fail verdict against the 50 ms target.
 
-| Metric | n | median | p95 | Verdict (p95 ≤ 50 ms) |
-| --- | --- | --- | --- | --- |
-| `frame_ms` | TBD (measure) | TBD | TBD | TBD |
-| `commit_ms` | TBD (measure) | TBD | TBD | TBD |
+**Test conditions.** Windows 11 desktop session, Python 3.14.5, PyQt5 5.15.11, a
+single display running at a scaled logical resolution, with the reference
+implementation closed (Section 2.2) and no other hook-owning tool active. The 48
+gestures were issued by `tools/demo_gesture.py`, which sends the same
+Alt + press + drag + release sequence a human performs.
+
+| Metric | n | min | median | p90 | p95 | p99 | max | Verdict |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |
+| `frame_ms` — all samples | 48 | 2.91 | 5.40 | 13.72 | 14.48 | 105.48 | 105.48 | PASS |
+| `frame_ms` — warm-up excluded | 47 | 2.91 | 5.40 | 13.10 | **13.81** | 15.47 | 15.47 | **PASS** |
+| `commit_ms` — button hold time, not latency | 48 | 73 | 137 | 1880 | 2958 | 4441 | 4441 | n/a |
+
+**Interpretation.**
+
+1. The steady-state p95 is **13.81 ms**, roughly 3.6 times under the 50 ms target
+   of NFR-01, with a median of 5.40 ms.
+2. Exactly one of the 48 samples exceeds 50 ms: 105.48 ms, on the first wheel of
+   the session. The first paint of a translucent Qt window is where the font
+   database, the glyph cache and window composition are first touched; afterwards
+   the distribution is tight (maximum 15.47 ms). Both views are reported because
+   hiding the outlier and quoting it as typical would each be dishonest.
+3. Even adding one full 60 Hz frame (~16.7 ms) of compositor presentation to every
+   sample, the steady-state p95 stays near 30 ms and the requirement still holds.
+4. `commit_ms` is the time the button was held, not a latency. The 137 ms median
+   is a natural drag; the 4.4 s maximum corresponds to gestures deliberately held
+   while screenshots were captured. It is reported because the probe records it,
+   not because it says anything about responsiveness.
+
+**Data-collection caveat.** The harness anchors the gesture on an empty strip of
+the taskbar so that the swallowed click cannot activate another application.
+Because that anchor sits near the bottom screen edge, downward drags are clipped
+by the boundary and end inside the dead zone: of 47 completed gestures, 40
+committed and 7 cancelled. The latency metric is sampled at the first paint and
+therefore does not depend on which slice is chosen; the skew affects only the
+recorded sector distribution, not the measurement.
 
 **Threats to validity, stated plainly.** `frame_ms` ends when Qt has painted
 into its backing store, *not* when the display presents the pixel; real perceived
@@ -538,16 +588,26 @@ so they describe this configuration rather than all configurations.
 
 ### 6.4 Resource and start-up measurements
 
-| Metric | Target | Measured |
-| --- | --- | --- |
-| Idle CPU (no wheel open) | < 1 % | TBD (measure) |
-| Idle working set | < 120 MB | TBD (measure) |
-| Cold start to tray ready | < 3 s | TBD (measure) |
-| Idle timers running | 0 | 0 (timer stops when nothing is animating) |
+| Metric | Target | Measured | Verdict |
+| --- | --- | --- | --- |
+| Idle CPU, no wheel open | < 1 % | < 0.01 % (no CPU-time tick in a 10 s sample) | PASS |
+| Idle working set | < 120 MB | 41 MB | PASS |
+| Cold start, process spawn → tray ready | < 3 s | 0.42 s | PASS |
+| Idle animation timers | 0 | 0 | PASS |
 
-The last row is a design guarantee rather than a measurement: the 60 Hz timer
-exists only while a window is visible, so an idle lolping has no animation work
-scheduled at all.
+Measurement method: the working set was read from the live process
+(`WorkingSet64`), idle CPU was computed as the change in process CPU time over a
+10-second window with no user interaction, and start-up was timed from process
+spawn to the moment the application logged that it was ready. The measurement
+process is the real interpreter, not the Windows Store `python.exe` launcher: an
+early attempt that sampled the launcher reported 15 MB and 0 % and was discarded
+as invalid, which is a reminder that process-level measurements need the right
+process.
+
+The idle-timer row is a structural guarantee rather than an observation: the
+60 Hz timer is started only when a window is shown and stopped as soon as neither
+a wheel nor a mark needs drawing, so an idle lolping has no animation work
+scheduled at all. This is what makes the sub-0.01 % idle CPU figure possible.
 
 ### 6.5 Discussion
 
