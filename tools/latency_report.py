@@ -2,7 +2,7 @@
 """Summarise the latency probe log written by ``python -m lolping --latency-probe``.
 
 The probe appends one JSON object per line to
-``%APPDATA%\\lolping\\latency.jsonl``::
+``%APPDATA%\\lolping-desktop\\latency.jsonl``::
 
     {"ts": "2026-10-24T12:00:00.123+08:00", "frame_ms": 12.4, "commit_ms": 840.2}
 
@@ -52,7 +52,7 @@ def _harden_console() -> None:
 
 
 def default_latency_path() -> Path:
-    """Return ``%APPDATA%\\lolping\\latency.jsonl`` (Windows) or a best guess."""
+    """Return ``%APPDATA%\\lolping-desktop\\latency.jsonl`` (Windows) or a best guess."""
     preferred = os.environ.get("APPDATA")
     if preferred:
         return Path(preferred) / "lolping" / "latency.jsonl"
@@ -256,7 +256,7 @@ def _build_parser() -> argparse.ArgumentParser:
         # argparse interpolates '%' in help strings (but not in the parser
         # description), so only the --path help below needs doubled signs.
         description=(
-            "Summarise %APPDATA%\\lolping\\latency.jsonl and check the "
+            "Summarise %APPDATA%\\lolping-desktop\\latency.jsonl and check the "
             "'p95 frame_ms <= 50 ms' acceptance criterion."
         ),
     )
@@ -267,7 +267,7 @@ def _build_parser() -> argparse.ArgumentParser:
         metavar="PATH",
         help=(
             "latency.jsonl to analyse "
-            "(default: %%APPDATA%%\\lolping\\latency.jsonl; '-' reads stdin)"
+            "(default: %%APPDATA%%\\lolping-desktop\\latency.jsonl; '-' reads stdin)"
         ),
     )
     parser.add_argument(

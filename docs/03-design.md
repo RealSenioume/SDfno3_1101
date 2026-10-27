@@ -404,7 +404,7 @@ would flash a tray icon before exiting.
 
 A Qt `QLocalServer` would work but pulls `QtNetwork` into the frozen build just
 to answer "am I first?". A one-byte `msvcrt.locking()` on
-`%APPDATA%\lolping\lolping.lock` needs no extra Qt module, leaves no socket
+`%APPDATA%\lolping-desktop\lolping.lock` needs no extra Qt module, leaves no socket
 behind, and is released by the OS if the process is killed.
 
 ### 10.3 Hook supervision
@@ -424,7 +424,7 @@ installed.
 
 ### 10.5 Records
 
-Three append-only files under `%APPDATA%\lolping\`, all JSON Lines so they can be
+Three append-only files under `%APPDATA%\lolping-desktop\`, all JSON Lines so they can be
 analysed without a parser library:
 
 * `pings.jsonl` — one line per committed ping (timestamp, sector index, name, x, y)

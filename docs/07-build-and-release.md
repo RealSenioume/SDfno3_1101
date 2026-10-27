@@ -54,7 +54,7 @@ The release zip is ignored by git; it is an artifact, not source.
 * Visual Studio Build Tools are **not** needed: PyQt5, pynput and PyInstaller
   install from wheels.
 * No administrator rights. Everything is per-user: the virtual environment
-  lives in the repository, and the app writes to `%APPDATA%\lolping`.
+  lives in the repository, and the app writes to `%APPDATA%\lolping-desktop`.
 * Network access for `pip install` on the build machine (the app itself never
   uses the network).
 
@@ -106,10 +106,10 @@ visible desktop when `QT_QPA_PLATFORM=offscreen` is set.
 
 | What | Path |
 | --- | --- |
-| Config | `%APPDATA%\lolping\config.json` |
-| Ping history | `%APPDATA%\lolping\pings.jsonl` |
-| Latency probe log | `%APPDATA%\lolping\latency.jsonl` |
-| Application log | `%APPDATA%\lolping\lolping.log` (rotating, 3 × 512 KB) |
+| Config | `%APPDATA%\lolping-desktop\config.json` |
+| Ping history | `%APPDATA%\lolping-desktop\pings.jsonl` |
+| Latency probe log | `%APPDATA%\lolping-desktop\latency.jsonl` |
+| Application log | `%APPDATA%\lolping-desktop\lolping.log` (rotating, 3 × 512 KB) |
 
 Never write state next to the executable: a one-folder build's `_internal`
 directory is owned by the installer/zip, and an installed copy may live under
@@ -166,7 +166,7 @@ python -m lolping --latency-probe     # leave it running, do ~20 pings
 python tools\latency_report.py
 ```
 
-The analyser reads `%APPDATA%\lolping\latency.jsonl` (override with
+The analyser reads `%APPDATA%\lolping-desktop\latency.jsonl` (override with
 `--path`, `-` reads stdin), skips malformed/truncated lines, prints
 n/min/median/p90/p95/p99/max for both `frame_ms` and `commit_ms`, a
 ready-to-paste Markdown table, and a PASS/FAIL verdict for the AC.
@@ -408,9 +408,9 @@ scanning on the build machine, rebuild, and re-enable it afterwards.
 | Symptom | Cause / fix |
 | --- | --- |
 | Frozen app starts but the global hook never fires | pynput loads `pynput.keyboard._win32` / `pynput.mouse._win32` lazily inside a helper, so static analysis misses them. They are listed in `hiddenimports` in `build\lolping.spec`; if a future pynput release adds another backend module, add it there and rebuild with `-Clean`. |
-| Frozen app dies instantly after a dialog | `--windowed` has no stdout. Check `%APPDATA%\lolping\lolping.log`; run the source version with `--debug`; or run `dist\lolping\lolping.exe --self-test` from a console with `QT_QPA_PLATFORM=offscreen` and inspect the exit code. |
+| Frozen app dies instantly after a dialog | `--windowed` has no stdout. Check `%APPDATA%\lolping-desktop\lolping.log`; run the source version with `--debug`; or run `dist\lolping\lolping.exe --self-test` from a console with `QT_QPA_PLATFORM=offscreen` and inspect the exit code. |
 | A traceback dialog appears on launch | `disable_windowed_traceback=False` keeps PyInstaller's error dialog. Read the first exception in the dialog, then reproduce with `python -m lolping --debug`. |
-| Config/log files written next to the exe | The app must use `%APPDATA%\lolping` (it does). Writing into the install folder fails for non-admin users and is wiped by zip upgrades. |
+| Config/log files written next to the exe | The app must use `%APPDATA%\lolping-desktop` (it does). Writing into the install folder fails for non-admin users and is wiped by zip upgrades. |
 | "Failed to execute script 'lolping'"? | Usually a missing hidden import or a module the analyser excluded. Rebuild with `-Clean`, then compare `build\_work\lolping\warn-lolping.txt`. |
 | Frozen app uses a stale description/size | PyInstaller caches analysis in `build\_work`; always `-Clean` after changing the spec, hidden imports or the Python version. |
 | `running scripts is disabled on this system` | `powershell -NoProfile -ExecutionPolicy Bypass -File .\build\build.ps1` (or `pwsh -NoProfile -ExecutionPolicy Bypass -File ...`); alternatively change the policy for the current user. |
@@ -438,7 +438,7 @@ Run every line from the repository root and keep the output for the report.
 - [ ] `dist\lolping\lolping.exe` starts on a clean-ish Windows machine, shows
       the tray icon, opens the wheel and commits a ping.
 - [ ] Settings dialog opens, changes persist to
-      `%APPDATA%\lolping\config.json`, "start with Windows" can be toggled.
+      `%APPDATA%\lolping-desktop\config.json`, "start with Windows" can be toggled.
 - [ ] `--latency-probe` run + `python tools\latency_report.py` gives
       `PASS` for p95 `frame_ms` <= 50 ms; paste the Markdown table and verdict
       into the report.

@@ -87,14 +87,14 @@ python -m lolping [--config PATH] [--latency-probe] [--debug] [--self-test]
 
 | Flag | Meaning |
 | --- | --- |
-| `--config PATH` | Use `PATH` instead of `%APPDATA%\lolping\config.json`. |
+| `--config PATH` | Use `PATH` instead of `%APPDATA%\lolping-desktop\config.json`. |
 | `--latency-probe` | Record one line per gesture in `latency.jsonl` (`frame_ms`, `commit_ms`). Intended for measurements, not normal use. |
 | `--debug` | Enable verbose diagnostic logging. |
 | `--self-test` | Run the built-in headless self-test and exit; useful after installation. |
 
 ## Files
 
-All user data lives in `%APPDATA%\lolping\`:
+All user data lives in `%APPDATA%\lolping-desktop\`:
 
 | File | Contents |
 | --- | --- |
@@ -115,6 +115,7 @@ All user data lives in `%APPDATA%\lolping\`:
 | `docs/05-user-manual.md` | Installation, gesture, settings reference, troubleshooting. |
 | `docs/06-report-outline.md` | Outline and evidence plan for the final report. |
 | `docs/07-build-and-release.md` | Packaging and release steps. |
+| `docs/08-report-draft.md` | Full report draft, with measurement placeholders marked TBD. |
 
 ## Limitations
 

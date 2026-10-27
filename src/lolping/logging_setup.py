@@ -1,7 +1,7 @@
 """Logging bootstrap.
 
 A windowed (``--noconsole``) build has nowhere to print, so everything that
-matters goes to a rotating file under ``%APPDATA%\\lolping``. ``--debug`` also
+matters goes to a rotating file under ``%APPDATA%\\lolping-desktop``. ``--debug`` also
 mirrors the log to stderr and to a console window when one exists.
 """
 

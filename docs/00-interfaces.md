@@ -79,7 +79,7 @@ class Config:
 ```
 
 ```python
-def app_data_dir() -> Path                 # %APPDATA%\lolping
+def app_data_dir() -> Path                 # %APPDATA%\lolping-desktop
 def config_path() -> Path                  # app_data_dir()/config.json
 def log_path() -> Path                     # app_data_dir()/pings.jsonl
 def latency_path() -> Path                 # app_data_dir()/latency.jsonl
@@ -205,13 +205,13 @@ CLI: `python -m lolping [--config PATH] [--latency-probe] [--debug]`
 
 ## 9. Log formats (the analyser in `tools/` reads these)
 
-`%APPDATA%\lolping\pings.jsonl`, one JSON object per line:
+`%APPDATA%\lolping-desktop\pings.jsonl`, one JSON object per line:
 
 ```json
 {"ts": "2026-10-24T12:00:00.123+08:00", "sector": 2, "name": "Assist Me", "x": 960, "y": 540}
 ```
 
-`%APPDATA%\lolping\latency.jsonl` (only with `--latency-probe`):
+`%APPDATA%\lolping-desktop\latency.jsonl` (only with `--latency-probe`):
 
 ```json
 {"ts": "2026-10-24T12:00:00.123+08:00", "frame_ms": 12.4, "commit_ms": 840.2}

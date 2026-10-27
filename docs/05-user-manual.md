@@ -87,7 +87,7 @@ All eight names can be changed in Settings.
 | --- | --- |
 | Settings… | Opens the settings dialog (5.6). |
 | Ping history log | Opens `pings.jsonl` in your default text editor. |
-| Open config folder | Opens `%APPDATA%\lolping\` in File Explorer. |
+| Open config folder | Opens `%APPDATA%\lolping-desktop\` in File Explorer. |
 | Pause / Resume | Stops or restores the trigger gesture. The menu shows the next action. |
 | Quit | Closes lolping, including its overlay and input listener. |
 
@@ -116,7 +116,7 @@ Cancel discards them. **Reset to defaults** restores every value below.
 | Reset to defaults | Button | — | Restores all defaults in this table. |
 
 If you want to edit settings without the interface, quit lolping and edit
-`%APPDATA%\lolping\config.json`. Unknown or invalid values are ignored and
+`%APPDATA%\lolping-desktop\config.json`. Unknown or invalid values are ignored and
 replaced by defaults the next time the file is loaded.
 
 ## 5.7 Command line
@@ -127,14 +127,14 @@ python -m lolping [--config PATH] [--latency-probe] [--debug] [--self-test]
 
 | Flag | Use |
 | --- | --- |
-| `--config PATH` | Load and save settings from `PATH` instead of `%APPDATA%\lolping\config.json`. Useful for testing or for a portable copy. |
+| `--config PATH` | Load and save settings from `PATH` instead of `%APPDATA%\lolping-desktop\config.json`. Useful for testing or for a portable copy. |
 | `--latency-probe` | Writes one line per gesture to `latency.jsonl` with the frame and commit times. Use it only for measurements; leaving it off keeps normal use lighter. |
 | `--debug` | Writes more detailed diagnostic logging. Use it when reporting a problem. |
 | `--self-test` | Runs the built-in headless self-test (the wheel is exercised offscreen, a test ping is committed and `SELF-TEST OK` is printed) and exits. Useful after installation to check that the configuration and overlay can start. |
 
 ## 5.8 Files and logs
 
-All user data is stored in `%APPDATA%\lolping\` (normally
+All user data is stored in `%APPDATA%\lolping-desktop\` (normally
 `C:\Users\<you>\AppData\Roaming\lolping\`):
 
 | File | Contents |
@@ -173,7 +173,7 @@ screen position of each commit.
    and press OK. Then choose **Quit**.
 2. Delete the project folder (for example `D:\DSH_workspace\lolping`), or the
    folder containing the packaged executable.
-3. Optionally delete `%APPDATA%\lolping\` to remove your settings and ping
+3. Optionally delete `%APPDATA%\lolping-desktop\` to remove your settings and ping
    logs. Copy `pings.jsonl` first if you want to keep it.
 4. If you removed the application before unticking "Start with Windows", open
    **Settings → Apps → Startup** (or Task Manager → Startup apps) and remove

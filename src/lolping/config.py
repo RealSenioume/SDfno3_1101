@@ -1,6 +1,6 @@
 """Persistent user configuration for lolping.
 
-The config is a plain JSON file in ``%APPDATA%\\lolping\\config.json``. Loading
+The config is a plain JSON file in ``%APPDATA%\\lolping-desktop\\config.json``. Loading
 is deliberately forgiving: a missing, truncated or hand-edited file must never
 stop the app from starting, it just falls back to the defaults for the broken
 fields.
@@ -20,7 +20,7 @@ from .geometry import clamp
 
 log = logging.getLogger(__name__)
 
-APP_NAME = "lolping"
+APP_NAME = "lolping-desktop"
 
 MODIFIER_NAMES: tuple[str, ...] = ("ctrl", "alt", "shift", "win")
 MOUSE_BUTTONS: tuple[str, ...] = ("left", "right", "middle", "x1", "x2")

@@ -20,7 +20,7 @@ Usage
        python tools\demo_gesture.py
 
 3. The app should draw the wheel, leave a mark, and append one line to
-   ``%APPDATA%\\lolping\\pings.jsonl`` and one to ``latency.jsonl``.
+   ``%APPDATA%\\lolping-desktop\\pings.jsonl`` and one to ``latency.jsonl``.
 
 Options
 -------
@@ -97,7 +97,7 @@ def main(argv: list[str] | None = None) -> int:
     time.sleep(0.05)
     keyboard.release(Key.alt)
 
-    print("gesture sent; check %APPDATA%\\lolping\\pings.jsonl for one new line")
+    print("gesture sent; check %APPDATA%\\lolping-desktop\\pings.jsonl for one new line")
     return 0
 
 
