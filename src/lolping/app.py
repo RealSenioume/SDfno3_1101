@@ -41,6 +41,7 @@ from .config import Config, app_data_dir, latency_path, log_path
 from .hotkeys import format_hotkey
 from .input_hook import InputBridge, InputHook
 from .logging_setup import install_excepthook, setup_logging
+from .mouse_guard import MouseGuard
 from .overlay import OverlayManager
 from .settings_dialog import SettingsDialog
 from .single_instance import SingleInstance
@@ -147,6 +148,7 @@ class PingApp:
         self._debug = debug
 
         self._paused = False
+        self._settings_open = False
         self._t_down = 0.0
         self._frame_ms: float | None = None
         self._wheel_centre = QPoint()
@@ -155,6 +157,14 @@ class PingApp:
         self._bridge = InputBridge()
         self._hook = InputHook(config, self._bridge)
         self._watcher = _FirstFrameWatcher()
+        # The native hook must be installed before the pynput listeners so that
+        # pynput still observes the gesture and the guard withholds it from every
+        # window afterwards (see mouse_guard.py for the hook-chain reasoning).
+        self._mouse_guard = MouseGuard(
+            config_provider=lambda: self._config,
+            paused_provider=lambda: self._paused,
+            wheel_open_provider=self._gesture_in_progress,
+        )
 
         # Neither PingApp nor QSystemTrayIcon's parent may be a plain Python
         # object: Qt requires a QObject parent, and the tray keeps its own
@@ -168,6 +178,15 @@ class PingApp:
 
     # ------------------------------------------------------------------ public
     def run(self) -> int:
+        if self._config.suppress_trigger_gesture:
+            if not self._mouse_guard.start():
+                self._tray.showMessage(
+                    "lolping",
+                    "The trigger gesture cannot be kept away from other windows; "
+                    "mouse clicks will reach the app underneath.",
+                    QSystemTrayIcon.Warning,
+                    6000,
+                )
         try:
             self._hook.start()
         except Exception:
@@ -188,12 +207,16 @@ class PingApp:
             )
 
         self._tray.show()
+        # Pay the first-gesture cost now, while no gesture is in flight: it keeps
+        # the mouse-capture race window at a few milliseconds instead of ~100 ms.
+        self._overlay.warm_up()
         log.info("lolping %s ready (%s)", __version__, self._trigger_hint())
         return self._app.exec_()
 
     def quit(self) -> None:
         log.info("quit requested")
         self._watcher.disarm()
+        self._mouse_guard.stop()
         try:
             self._hook.stop()
         except Exception:  # pragma: no cover
@@ -202,6 +225,7 @@ class PingApp:
             self._overlay.shutdown()
         except Exception:  # pragma: no cover
             log.exception("shutting the overlay down failed")
+        sounds.cleanup()
         self._tray.hide()
         self._instance.release()
         self._app.quit()
@@ -235,6 +259,10 @@ class PingApp:
     def _on_hover_changed(self, index: int) -> None:
         if index >= 0:
             self._play("hover", index)
+
+    def _gesture_in_progress(self) -> bool:
+        """True between the trigger press and its release (mouse guard input)."""
+        return self._hook.wheel_open or self._overlay.is_open()
 
     def _on_trigger_down(self, x: int, y: int, pressed_at: float) -> None:
         if self._paused:
@@ -375,7 +403,9 @@ class PingApp:
         self._tray.activated.connect(self._on_tray_activated)
 
     def _on_tray_activated(self, reason: int) -> None:
-        if reason in (QSystemTrayIcon.DoubleClick, QSystemTrayIcon.Trigger):
+        # Windows reports a double-click as Trigger first and DoubleClick second.
+        # Opening the dialog on both events is what produced two stacked windows.
+        if reason == QSystemTrayIcon.DoubleClick:
             self._open_settings()
 
     def _set_paused(self, paused: bool) -> None:
@@ -385,7 +415,15 @@ class PingApp:
         log.info("paused=%s", self._paused)
 
     def _open_settings(self) -> None:
-        edited = SettingsDialog.edit(self._config, None)
+        if self._settings_open:
+            # A queued second activation must not stack another modal dialog on
+            # top of the first one.
+            return
+        self._settings_open = True
+        try:
+            edited = SettingsDialog.edit(self._config, None)
+        finally:
+            self._settings_open = False
         if edited is None:
             return
         if edited.start_with_windows != autostart.is_enabled():

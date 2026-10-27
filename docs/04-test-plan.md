@@ -1,8 +1,8 @@
-# 4. Test plan — lolping v0.3.0
+# 4. Test plan — lolping v0.3.1
 
 ## 4.1 Purpose and scope
 
-This plan describes how lolping v0.3.0 is verified against
+This plan describes how lolping v0.3.1 is verified against
 `docs/02-requirements.md`: unit tests of the pure logic, system tests of the
 complete application on a documented Windows matrix, and measurement protocols
 for the non-functional requirements. Build verification is covered by

@@ -16,7 +16,7 @@ vector `QPainterPath` geometry generated in `src/lolping/assets.py`, and the
 sound cues are synthesised in `src/lolping/sounds.py`, so the repository
 contains no Riot Games assets and no binary media files.
 
-- Version: **0.3.0**
+- Version: **0.3.1**
 - Platform: **Windows 11** (64-bit)
 - Runtime: **Python 3.14**, **PyQt5 5.15.11**, **pynput 1.8.2**
 - No other runtime dependencies, no network access at runtime
@@ -157,7 +157,7 @@ All user data lives in `%APPDATA%\lolping-desktop\`:
 - **Sound overlap.** The Windows `winsound` API plays one asynchronous sound at
   a time, so a newer cue interrupts the previous one. For short cues this is a
   deliberate trade-off, not a defect.
-- **Scope.** Windows only, fixed eight sectors in v0.3.0, no game awareness, no
+- **Scope.** Windows only, fixed eight sectors in v0.3.1, no game awareness, no
   team or room features, no cross-platform support.
 
 ## License

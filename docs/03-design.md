@@ -1,6 +1,6 @@
 # lolping — Design Document
 
-Version 0.3.0 · Windows 11 · Python 3.14 · PyQt5 5.15.11 · pynput 1.8.2
+Version 0.3.1 · Windows 11 · Python 3.14 · PyQt5 5.15.11 · pynput 1.8.2
 
 This document explains *how* the system is built and *why* it is built that way.
 Requirements live in [`02-requirements.md`](02-requirements.md), the test
@@ -415,11 +415,20 @@ comes from a pentatonic table indexed by the slice number. Buffers are
 sample scale and as part of the cache key, so at most 11 buffers exist per
 (cue, slice) pair. `render_wav(cue, volume, index)` caches by
 `(cue, index % 8, volume step)`; repeated gestures reuse the same bytes, which
-is what keeps synthesis off the hot path (NFR-14). Playback is
-`winsound.PlaySound(data, SND_MEMORY | SND_ASYNC | SND_NODEFAULT)` and keeps the
-buffer referenced while it plays, so the GUI thread never blocks. `play()` never
-raises: if no audio device is available the exception is logged and the wheel
-keeps working.
+is what keeps synthesis off the hot path (NFR-14).
+
+**Playback, and why files are involved.** Windows refuses
+`winsound.PlaySound` with `SND_MEMORY | SND_ASYNC` — it raises
+`RuntimeError: Cannot play asynchronously from memory` — and a synchronous
+memory play would block the GUI thread for the length of the cue. The generated
+bytes are therefore written once per (cue, slice, volume step) into
+`%TEMP%\lolping-cues\` and played with `SND_FILENAME | SND_ASYNC`, which the API
+does support. The files are a cache, not assets: they are produced at runtime,
+never committed, and deleted on a clean exit by `sounds.cleanup()`. `play()`
+never raises: if no audio device or file access is available the exception is
+logged and the wheel keeps working. This defect was found in manual testing
+after the first implementation used the memory flags, and is pinned by
+`tests/test_sounds.py::TestPlaybackContract`.
 
 **Event mapping.** `PingApp` maps wheel events to cues: `begin` → `open`,
 `OverlayManager.hover_changed` → `hover`, `committed` → `commit` (with the
@@ -480,7 +489,7 @@ expected results (`docs/04-test-plan.md`, TC-28 … TC-30).
 | `trigger_mouse_button` | str | `"left"` | left/right/middle/x1/x2 |
 | `wheel_radius` | int | 130 | 60–400 |
 | `dead_zone` | int | 34 | 5–(`wheel_radius`−20) |
-| `sector_count` | int | 8 | fixed in 0.3.0 |
+| `sector_count` | int | 8 | fixed in 0.3.1 |
 | `sectors` | list[str] | LoL-style names | length == `sector_count` |
 | `animation_tau` | float | 0.035 | 0.005–0.5 s |
 | `mark_duration_ms` | int | 900 | 300–4000 |
@@ -608,7 +617,7 @@ An honest measurement section has to name its own weaknesses:
 | D6 | JSON config file | `QSettings`, registry, TOML | Human-readable, diffable, trivially quotable in the report | Manual atomic-write code |
 | D7 | Total `from_dict` repair | Strict validation | Never brick the app from a bad file | Silent clamping can surprise; logged |
 | D8 | File lock for single instance | `QLocalServer`, named mutex | No QtNetwork dependency in the frozen build | Windows-specific |
-| D9 | Swallow the trigger click | Click-through | Prevents the click activating a link/button underneath | A stray click is "eaten" by the wheel window |
+| D9 | Native `WH_MOUSE_LL` guard withholds the trigger gesture | Click-through, or capture-only mitigation | A returning-1 hook removes the press before any window sees it, so the desktop cannot start a selection or an OLE drag; capture is kept as a second line of defence | Alt + click is reserved system wide while lolping runs; exposed as `suppress_trigger_gesture` |
 | D10 | Generate icon/sound in code | Ship PNG/WAV assets | No Riot-owned or binary files in the repo | Slightly less polished visuals |
 | D11 | `--self-test` in the app | Tests only | CI and the build script can smoke-test the packaged behaviour | Small amount of product code serving tests |
 | D12 | JSONL logs | CSV, SQLite | Append-only, one write per event, no schema migration | Duplicated keys per line |
@@ -624,12 +633,20 @@ Design-inherent, documented rather than hidden:
 
 1. Exclusive-fullscreen applications hide the overlay (compositor bypass).
 2. Elevated (administrator) windows cannot be hooked or drawn over (UIPI).
-3. Input is observed, not suppressed (`pynput`); a click during the gesture still
-   reaches the underlying window unless the overlay window covers it (it does,
-   for the duration of the wheel, and for the mark's fade).
+3. `pynput` alone can only observe, not suppress. The gesture is therefore
+   removed from the input stream by a native `WH_MOUSE_LL` guard
+   (`src/lolping/mouse_guard.py`) that is installed **before** the pynput
+   listeners: Windows calls the most recently installed hook first, so pynput
+   still sees the gesture and the guard withholds it from every window after
+   that. The consequence is a documented trade-off: while lolping runs with the
+   guard enabled, the trigger combination (Alt + click by default) does nothing
+   in other applications. Turning off **Reserve the trigger for lolping** in the
+   settings restores normal Alt + click and falls back to the weaker mitigation
+   (mouse capture plus the start-up warm-up), in which case a drag over the
+   desktop can still start a selection or an icon drag.
 4. Mixed-DPI multi-monitor: correct on the active screen only.
 5. Windows only — `msvcrt`, `winreg`, `winsound` are used directly.
-6. Pause is manual; fullscreen-app auto-pause is not implemented in 0.3.0.
+6. Pause is manual; fullscreen-app auto-pause is not implemented in 0.3.1.
 7. Sound cues cannot overlap: `winsound` stops the previous asynchronous sound
    when a new one starts. Documented as a trade-off; with 28–200 ms cues the
    audible effect is negligible.

@@ -3,7 +3,7 @@
 **Course:** SD5913 — Semester 1
 **Author:** Zhexian Tao
 **Student repository:** <https://github.com/RealSenioume/SDfno3_1101>
-**Version described:** 0.3.0
+**Version described:** 0.3.1
 
 ---
 
@@ -15,12 +15,12 @@ game. That gesture is fluent, and it is locked inside one application. This
 project re-implements the gesture as a standalone Windows desktop overlay so it
 can be used while presenting, streaming, tutoring or reviewing a match.
 
-The delivered artefact, `lolping` 0.2.0, is a tray-resident Python/PyQt5
+The delivered artefact, `lolping` 0.3.1, is a tray-resident Python/PyQt5
 application. It installs global keyboard and mouse hooks, draws a translucent
 always-on-top wheel centred on the pointer without stealing focus, animates the
 selection with frame-rate-independent exponential smoothing, leaves a fading
 mark where the ping was placed, and records every ping as JSON Lines. It is
-built from 14 modules totalling roughly 3,100 lines of Python, with 97
+built from 15 modules totalling roughly 3,600 lines of Python, with 134
 automated unit tests covering the geometry, configuration-repair,
 input-state-machine, icon and audio logic, plus a packaging pipeline that
 produces a standalone executable.
@@ -93,7 +93,7 @@ The objectives were:
 * A measurement methodology for trigger-to-first-paint latency that includes the
   cross-thread queue hop, together with an explicit statement of what it does
   *not* include.
-* An automated suite of 97 tests over the parts of the system most likely to be
+* An automated suite of 134 tests over the parts of the system most likely to be
   wrong (angle conventions, hostile configuration, input state transitions, icon
   fallbacks, audio buffers).
 
@@ -128,13 +128,13 @@ optional local-network rooms. It is a mature, cross-platform product.
 
 The present project differs deliberately:
 
-| Aspect | lolPing | lolping 0.2.0 |
+| Aspect | lolPing | lolping 0.3.1 |
 | --- | --- | --- |
 | Stack | Electron + TypeScript + C++ helper | Python 3.14 + PyQt5 + pynput |
 | Input suppression | Helper swallows Alt+drag | Cannot suppress; documented limitation |
 | Platforms | Windows, macOS, experimental Linux | Windows only |
 | Extras | Rooms, emotes, updates, i18n | None — single-purpose |
-| Code size | Tens of thousands of lines | ~3,100 lines |
+| Code size | Tens of thousands of lines | ~3,600 lines |
 | Purpose | Product | Coursework artefact, built from scratch |
 
 Its published limitations corroborate two constraints found independently here:
@@ -382,7 +382,7 @@ Three failure modes received explicit design attention:
 | D6 | JSON file | `QSettings`, registry, TOML | Manual atomic-write code |
 | D7 | Total repair-on-load | Strict validation | Silent clamping can surprise the user |
 | D8 | File lock | `QLocalServer`, named mutex | Windows-specific |
-| D9 | Swallow the trigger click | Click-through overlay | A click is consumed by the wheel window |
+| D9 | Native `WH_MOUSE_LL` guard withholds the trigger gesture | Mouse capture only, or click-through | A returning-1 hook removes the press before any window sees it, so the desktop cannot start a selection or an OLE drag; capture and the start-up warm-up remain as a second line of defence | Alt + click is reserved system wide while running; exposed as `Config.suppress_trigger_gesture` |
 | D10 | Generate icon and sound in code | Ship PNG/WAV assets | Less polished assets; no binary files in the repo |
 
 ---
@@ -396,6 +396,7 @@ Three failure modes received explicit design attention:
 | `geometry.py` | 85 | Sector hit testing, angles, easing |
 | `config.py` | 251 | Schema, repair, atomic persistence, paths |
 | `hotkeys.py` | 124 | Parse and format `"ctrl+shift+q"` |
+| `mouse_guard.py` | 285 | Native `WH_MOUSE_LL` hook that withholds the trigger gesture |
 | `assets.py` | 259 | Ten vector icons, pixmap cache, user PNG fallback |
 | `input_hook.py` | 302 | OS hooks, key normalisation, supervisor |
 | `overlay.py` | 867 | Per-screen windows, painting, wheel/burst animation |
@@ -444,10 +445,49 @@ The same ordering is used on open, so the first visible frame is already
 correct. This is a small change with a large perceptual effect, and it is the
 kind of defect that would be hard to justify without a diagnosis.
 
-### 5.4 Defects found by the test suite
+**Keeping the desktop untouched.** This was the most interesting defect of the
+project, because the first two attempts at it were wrong in instructive ways.
 
-The 97 tests were not written after the fact; three real defects surfaced while
-writing them:
+A global observer cannot withhold the press that triggers the gesture: by the
+time the wheel exists, the window underneath has already received the mouse-down.
+The first attempt was therefore a *mitigation*: the overlay calls `SetCapture` on
+itself as soon as it is shown, so Windows delivers `WM_CAPTURECHANGED` to the
+previous owner and a well-behaved application aborts the interaction it started.
+Every close path releases the capture, because a window that hides while holding
+it would freeze the pointer for the whole desktop.
+
+Manual testing showed this was not enough. The capture arrives a few
+milliseconds after the press, and the mouse reports at up to 1000 Hz, so a move
+almost always slips through first; Explorer then starts its rubber-band selection
+or its OLE drag-and-drop, and neither can be undone from outside. A second
+attempt attacked the delay: the native handle and the capture were taken before
+the first paint, and `OverlayManager.warm_up()` moved the one-off 103 ms
+first-window cost (native surface plus font and glyph caches) to start-up by
+creating and pre-painting one window per screen into an offscreen image. That
+made the first gesture as fast as the later ones but still did not eliminate the
+problem, which is the empirical answer to "why not just make it faster": a
+two-millisecond race against a 1000 Hz input device is still a race you lose.
+
+The final design removes the events instead of racing them. `mouse_guard.py`
+installs a native `WH_MOUSE_LL` hook whose procedure returns 1 for the trigger
+button while the configured modifiers are held, and for any mouse button while
+the wheel is open. It is installed **before** the `pynput` listeners, so the hook
+chain is `pynput (sees the gesture) → guard (withholds it) → target window`: the
+application can never lose its own trigger, and no window below ever learns that
+the press happened. The capture and the warm-up are kept as defence in depth.
+The trade-off is explicit and configurable: while the guard is armed, Alt + click
+is reserved system wide, and turning off *Reserve the trigger for lolping*
+restores normal Alt + click at the cost of the old behaviour. The decision rules
+are a pure function covered by `tests/test_mouse_guard.py`, and the hook
+install/remove path is smoke-tested in the same suite.
+
+### 5.4 Defects found by testing
+
+The tests were not written after the fact, and the manual session was not a
+rubber stamp: five real defects surfaced, three while writing the suite and two
+while exercising the v0.3.0 build by hand.
+
+*From the automated suite:*
 
 1. **Esc left the hook's `wheel_open` flag set**, so the next trigger could be
    ignored and the pending mouse-up was still treated as a commit candidate.
@@ -458,6 +498,27 @@ writing them:
 3. **A test-side regression**: the temp-directory strategy assumed the system
    TEMP directory was writable. Fixed to probe candidates and fall back, which
    also makes the suite runnable in restricted environments.
+
+*From manual testing of the 0.3.0 build:*
+
+4. **Audio never played.** `winsound.PlaySound` was called with
+   `SND_MEMORY | SND_ASYNC`, which Windows rejects with
+   `RuntimeError: Cannot play asynchronously from memory`; the wheel worked but
+   every cue logged an error. A synchronous memory play would have blocked the
+   GUI thread, so the design changed: generated bytes are now written once to a
+   temp cache file and played by filename with `SND_ASYNC`. This is the most
+   instructive defect in the project, because the limitation is documented in
+   the Python standard library and was still missed on the first attempt —
+   a reminder that an API being "obvious" is not the same as being understood.
+5. **A tray double-click opened two stacked settings dialogs.** Windows reports
+   a double-click as `Trigger` followed by `DoubleClick`; because the first
+   dialog runs a modal event loop, the queued second activation opened a second
+   dialog on top of it. Fixed twice over: only `DoubleClick` opens the dialog,
+   and `_open_settings` now refuses to re-enter.
+
+Both manual-testing defects are pinned by regression tests
+(`tests/test_sounds.py::TestPlaybackContract`, `tests/test_app.py`), so neither
+can silently return.
 
 ### 5.5 Packaging
 
@@ -503,14 +564,20 @@ name above the burst with a dark halo for legibility over bright content.
 
 **Synthesised audio.** Four cues — open, hover tick, commit chime, cancel sweep —
 are generated as decaying sines with an optional frequency sweep and second
-harmonic, quantised to ten volume steps and cached as in-memory WAV buffers. The
-commit chime picks a note from a pentatonic scale by slice index, so the eight
-slices are audibly distinct without any of them sounding wrong together. No audio
-file ships, and no Riot audio is used. Playback goes through `winsound` rather
-than QtMultimedia, which keeps a large Qt module out of the frozen build at the
-cost of one limitation: `winsound` plays one asynchronous sound at a time, so a
-newer cue interrupts the previous one. For cues that last 30–200 ms this is
-inaudible in practice and is documented as a design decision rather than a defect.
+harmonic, quantised to ten volume steps and cached. The commit chime picks a note
+from a pentatonic scale by slice index, so the eight slices are audibly distinct
+without any of them sounding wrong together. No audio file ships, and no Riot
+audio is used. Playback goes through `winsound` rather than QtMultimedia, which
+keeps a large Qt module out of the frozen build, at the cost of two constraints
+that had to be designed around. First, `winsound` refuses
+`SND_MEMORY | SND_ASYNC` ("cannot play asynchronously from memory"), and a
+synchronous memory play would block the GUI thread, so the generated bytes are
+materialised as small WAV files under `%TEMP%` and played by name; the files are
+a runtime cache, deleted on exit. Second, `winsound` plays one asynchronous sound
+at a time, so a newer cue interrupts the previous one — inaudible for cues that
+last 30–200 ms, and documented as a design decision rather than a defect. Both
+constraints were discovered by manual testing after the first implementation, and
+the file-based path is now pinned by a regression test.
 
 ---
 
@@ -526,8 +593,10 @@ inaudible in practice and is documented as a design decision rather than a defec
 | `test_input_hook.py` | ~22 | Trigger, commit, cancels, quit hotkey, modifier edge cases, key tokens |
 | `test_assets.py` | ~14 | Icon registry and defaults, fallback chain, every icon paints pixels, pixmap cache, missing user image |
 | `test_sounds.py` | ~11 | WAV headers and lengths, volume scaling, silence at zero, per-slice pitch, cache, playback safety |
+| `test_app.py` | ~7 | Tray activation opens one dialog only, re-entrant open ignored, cue gating by config |
+| `test_mouse_guard.py` | ~16 | Suppression rules for every mouse event, paused/disarmed guards, hook lifecycle |
 
-Result: **97 tests, all passing** (`python -m unittest discover -s tests`), in
+Result: **134 tests, all passing** (`python -m unittest discover -s tests`), in
 about 60 ms, with no display and no hooks installed (the icon suite forces the
 offscreen Qt platform).
 
@@ -685,14 +754,18 @@ goal into a number and an argument.
 2. **Elevated windows.** Windows User Interface Privilege Isolation prevents a
    normal-integrity process from hooking or drawing over an administrator
    window.
-3. **No input suppression.** `pynput` observes but cannot swallow input. The
-   overlay window is on top for the duration of the gesture, so the click is
-   consumed, but a third-party hook running earlier in the chain could still
-   see it.
+3. **The trigger gesture is reserved.** `pynput` can only observe, so the press is
+   withheld by a native `WH_MOUSE_LL` guard instead. That works, and it is what
+   makes drags over the desktop invisible, but it reserves the trigger combination:
+   while lolping runs with the guard armed, Alt + click does nothing in other
+   applications. The option can be turned off, which restores normal Alt + click
+   and brings back the weaker capture-only behaviour (a fast drag can then start a
+   selection or an icon drag). The guard also cannot withhold keyboard events, so
+   holding Alt alone may still focus a menu bar in some applications.
 4. **Mixed-DPI multi-monitor.** Correct on the screen where the wheel opens;
    marks stay on that screen.
 5. **Windows only.** `msvcrt`, `winreg` and `winsound` are used directly.
-6. **No fullscreen auto-pause.** Pausing is manual in 0.2.0.
+6. **No fullscreen auto-pause.** Pausing is manual in 0.3.1.
 7. **Single-author evaluation.** The latency and usability data describe one
    machine and one user.
 
@@ -720,8 +793,8 @@ keeps stale pixels, a control character that defeats a hotkey comparison, a
 mixed-DPI desktop that breaks the obvious window architecture, and a global hook
 that fails silently by design.
 
-The result is a 3,100-line Python application with a documented architecture,
-thirteen explicit design decisions with rejected alternatives, 97 automated tests, a
+The result is a 3,600-line Python application with a documented architecture,
+thirteen explicit design decisions with rejected alternatives, 134 automated tests, a
 formal manual test matrix, a packaging pipeline and a measured latency
 methodology. It honours every objective set out in Section 1.3: the gesture is
 reproduced, the tool is self-sufficient on a clean machine, the game client is
@@ -766,7 +839,7 @@ states what it cannot do is more trustworthy than one that does not.
 src/lolping/     13 modules: geometry, config, hotkeys, input_hook, overlay,
                  settings_dialog, app, single_instance, autostart, sounds,
                  logging_setup, __init__, __main__
-tests/           6 unittest suites, 97 tests
+tests/           8 unittest suites, 134 tests
 tools/           smoke_test.py, latency_report.py, demo_gesture.py
 build/           lolping.spec (PyInstaller), build.ps1
 docs/            00 module contract, 01 proposal, 02 requirements,

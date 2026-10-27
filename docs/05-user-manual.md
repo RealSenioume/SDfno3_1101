@@ -1,4 +1,4 @@
-# 5. User manual — lolping v0.3.0
+# 5. User manual — lolping v0.3.1
 
 ## 5.1 What lolping is
 
@@ -109,6 +109,7 @@ Cancel discards them. **Reset to defaults** restores every value below.
 | --- | --- | --- | --- |
 | Trigger modifiers | Checkboxes: Ctrl, Alt, Shift, Win | Alt | The wheel opens only while every ticked modifier is held. |
 | Trigger button | Mouse-button selector | Left | The button that opens the wheel: left, right, middle, X1 or X2. |
+| Reserve the trigger for lolping | Checkbox | On | Withholds the trigger gesture from other windows, so dragging over the desktop or an icon cannot start a selection or an icon drag. While it is on, the trigger combination does nothing in other applications. |
 | Wheel radius | Slider | 130 | Outer radius of the wheel in logical pixels; 60 to 400. |
 | Dead zone | Slider | 34 | Radius of the inner circle in logical pixels; releasing inside it cancels. Range 5 to the wheel radius minus 20. |
 | Sector names | Eight text fields | On My Way … Push | The labels shown on the wheel and written to the log. Keep them short for legibility. |
@@ -253,8 +254,17 @@ listed in section 5.10, and it stays on your machine.
 
 - Exclusive-fullscreen applications and elevated windows can prevent the
   overlay from appearing (see Troubleshooting).
-- lolping has eight fixed sectors in v0.3.0.
+- lolping has eight fixed sectors in v0.3.1.
 - Sound cues cannot overlap: a new cue stops the previous one (see section 5.8).
+- The mouse button is seen by the window underneath before the wheel can appear,
+  because a program cannot withhold input without a native hook. lolping installs
+  one: with **Reserve the trigger for lolping** enabled (the default), the
+  trigger combination is removed from the input stream before any window sees it,
+  so dragging over the desktop or over an icon cannot start a selection or an
+  icon drag. The price is that the same combination does nothing in other
+  applications while lolping runs; turn the option off in Settings to get Alt +
+  click back, at the cost of the old behaviour (the wheel still appears, but the
+  desktop may react to the drag first).
 - Windows 11 only.
 - It does not know about the game: the labels are generic and nothing is sent to
   teammates.

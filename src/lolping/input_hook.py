@@ -223,6 +223,12 @@ class InputHook:
     def healthy(self) -> bool:
         return self._listeners_alive()
 
+    @property
+    def wheel_open(self) -> bool:
+        """Whether a gesture is in progress (the mouse guard needs this)."""
+        with self._state.lock:
+            return self._state.wheel_open
+
     # ----------------------------------------------------------------- private
     def _listeners_alive(self) -> bool:
         keyboard_ok = self._keyboard_listener is not None and self._keyboard_listener.is_alive()

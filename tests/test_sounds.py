@@ -92,5 +92,65 @@ class TestPlaybackSafety(unittest.TestCase):
             sounds.winsound = original
 
 
+class _RecordingWinsound:
+    """Minimal stand-in that records how PlaySound is called."""
+
+    SND_FILENAME = 0x00020000
+    SND_MEMORY = 0x00000004
+    SND_ASYNC = 0x0001
+    SND_NODEFAULT = 0x0002
+
+    calls: list[tuple[str, int]] = []
+
+    @classmethod
+    def PlaySound(cls, sound: object, flags: int) -> None:  # noqa: N802 - Windows API
+        cls.calls.append((sound, flags))
+
+
+class TestPlaybackContract(unittest.TestCase):
+    """Regression test for the "cannot play asynchronously from memory" bug."""
+
+    def setUp(self) -> None:
+        sounds.clear_cache()
+        self._original = sounds.winsound
+        _RecordingWinsound.calls = []
+        sounds.winsound = _RecordingWinsound  # type: ignore[assignment]
+
+    def tearDown(self) -> None:
+        sounds.winsound = self._original  # type: ignore[assignment]
+        sounds.clear_cache()
+
+    def test_plays_a_file_not_a_memory_buffer(self) -> None:
+        sounds.play("hover", 0.5, 0)
+        self.assertEqual(len(_RecordingWinsound.calls), 1)
+        sound, flags = _RecordingWinsound.calls[0]
+        self.assertIsInstance(sound, str, "winsound needs a path, not bytes")
+        self.assertTrue(flags & _RecordingWinsound.SND_FILENAME)
+        self.assertTrue(flags & _RecordingWinsound.SND_ASYNC)
+        self.assertFalse(flags & _RecordingWinsound.SND_MEMORY)
+
+    def test_the_wav_file_exists_and_matches_the_rendered_buffer(self) -> None:
+        sounds.play("commit", 0.5, 3)
+        sound, _flags = _RecordingWinsound.calls[0]
+        path = Path(str(sound))
+        self.assertTrue(path.exists())
+        self.assertEqual(path.read_bytes(), sounds.render_wav("commit", 0.5, 3))
+
+    def test_cleanup_removes_the_generated_files(self) -> None:
+        sounds.play("open", 0.4, 0)
+        sound, _flags = _RecordingWinsound.calls[0]
+        path = Path(str(sound))
+        self.assertTrue(path.exists())
+        sounds.cleanup()
+        self.assertFalse(path.exists())
+
+    def test_volume_steps_get_separate_files(self) -> None:
+        sounds.play("open", 0.2, 0)
+        sounds.play("open", 0.9, 0)
+        first = Path(str(_RecordingWinsound.calls[0][0]))
+        second = Path(str(_RecordingWinsound.calls[1][0]))
+        self.assertNotEqual(first, second)
+
+
 if __name__ == "__main__":
     unittest.main()

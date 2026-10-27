@@ -87,6 +87,9 @@ class Config:
 
     trigger_modifiers: list[str] = field(default_factory=lambda: ["alt"])
     trigger_mouse_button: str = "left"
+    #: Withhold the trigger gesture from other windows (native low-level hook).
+    #: On, Alt + click is reserved system wide while lolping runs.
+    suppress_trigger_gesture: bool = True
     wheel_radius: int = 130
     dead_zone: int = 34
     sector_count: int = SECTOR_COUNT
@@ -125,6 +128,9 @@ class Config:
 
         config.trigger_modifiers = _clean_modifiers(
             data.get("trigger_modifiers"), config.trigger_modifiers
+        )
+        config.suppress_trigger_gesture = _flag(
+            data.get("suppress_trigger_gesture"), config.suppress_trigger_gesture
         )
         config.trigger_mouse_button = _choice(
             data.get("trigger_mouse_button"), MOUSE_BUTTONS, config.trigger_mouse_button

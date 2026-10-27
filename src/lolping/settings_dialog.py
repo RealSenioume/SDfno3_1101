@@ -121,6 +121,7 @@ class SettingsDialog(QDialog):
             trigger_mouse_button=str(
                 self._button_combo.currentData() or self._base_config.trigger_mouse_button
             ),
+            suppress_trigger_gesture=bool(self._suppress_check.isChecked()),
             wheel_radius=radius,
             dead_zone=dead_zone,
             sector_count=SECTOR_COUNT,
@@ -223,6 +224,15 @@ class SettingsDialog(QDialog):
         self._button_combo.setMinimumWidth(170)
         button_row.addWidget(self._button_combo, 1)
         layout.addLayout(button_row)
+
+        self._suppress_check = QCheckBox("Reserve the trigger for lolping", group)
+        self._suppress_check.setToolTip(
+            "Withhold the gesture from other windows so that dragging over the "
+            "desktop cannot start a selection or an icon drag. While this is on, "
+            "the trigger combination (Alt + click by default) does nothing in "
+            "other applications."
+        )
+        layout.addWidget(self._suppress_check)
         return group
 
     def _build_wheel_group(self, parent: QWidget) -> QGroupBox:
@@ -429,6 +439,8 @@ class SettingsDialog(QDialog):
 
         button_index = self._button_combo.findData(config.trigger_mouse_button)
         self._button_combo.setCurrentIndex(button_index if button_index >= 0 else 0)
+
+        self._suppress_check.setChecked(bool(config.suppress_trigger_gesture))
 
         radius = min(max(int(config.wheel_radius), _RADIUS_MIN), _RADIUS_MAX)
         self._radius_slider.setValue(radius)

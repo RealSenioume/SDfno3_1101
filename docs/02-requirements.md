@@ -1,9 +1,9 @@
-# 2. Requirements — lolping v0.3.0
+# 2. Requirements — lolping v0.3.1
 
 ## 2.1 Purpose and conventions
 
-This document states what lolping v0.3.0 must do. It derives from the frozen
-module contract in `docs/00-interfaces.md`, extended by the v0.3.0 feature brief
+This document states what lolping v0.3.1 must do. It derives from the frozen
+module contract in `docs/00-interfaces.md`, extended by the v0.3.0 and v0.3.1 feature briefs
 for slice artwork, animation and sound, and is the reference for the design
 (`docs/03-design.md`) and tests (`docs/04-test-plan.md`). "Must" marks a
 mandatory requirement. Values that are not fixed yet are written as
@@ -98,7 +98,7 @@ mandatory requirement. Values that are not fixed yet are written as
 | `trigger_mouse_button` | `left` | left, right, middle, x1, x2 |
 | `wheel_radius` | 130 | 60–400 (logical px) |
 | `dead_zone` | 34 | 5 to `wheel_radius − 20` |
-| `sector_count` | 8 | fixed at 8 in v0.3.0 |
+| `sector_count` | 8 | fixed at 8 in v0.3.1 |
 | `sectors` | On My Way, All-In, Assist Me, Need Vision, Enemy Missing, Enemy Vision, Retreat, Push | eight names |
 | `animation_tau` | 0.035 | 0.005–0.5 |
 | `mark_duration_ms` | 900 | 300–4000 |

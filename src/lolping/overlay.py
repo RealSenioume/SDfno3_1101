@@ -26,6 +26,13 @@ import time
 from dataclasses import dataclass
 from functools import partial
 
+try:  # pragma: no cover - the project targets Windows
+    import ctypes
+
+    _USER32 = ctypes.windll.user32  # type: ignore[attr-defined]
+except (ImportError, AttributeError):  # pragma: no cover
+    _USER32 = None
+
 from PyQt5.QtCore import QObject, QPoint, QPointF, QRect, QRectF, Qt, QTimer, pyqtSignal
 from PyQt5.QtGui import (
     QColor,
@@ -33,6 +40,7 @@ from PyQt5.QtGui import (
     QFont,
     QFontMetrics,
     QGuiApplication,
+    QImage,
     QPainter,
     QPainterPath,
     QPaintEvent,
@@ -133,6 +141,8 @@ class OverlayWindow(QWidget):
         self._marks: list[_Mark] = []
         self._last_tick = time.perf_counter()
         self._opened_at = 0.0
+        self._captured = False
+        self._warmed = False
 
         self._setup_window()
 
@@ -232,14 +242,108 @@ class OverlayWindow(QWidget):
         self._last_tick = time.perf_counter()
         self._opened_at = self._last_tick  # drives the 0.13 s open animation
 
-        # Show without activating: no showNormal/activateWindow/focus call here.
+        # Take the capture before painting. Every millisecond between the press
+        # and the capture is a millisecond in which the application underneath
+        # can still start a drag or a rubber-band selection, so the native handle
+        # is created first and the capture re-asserted after the window is shown.
+        self._take_pointer_capture()
         self.show()
         self.raise_()
+        self._take_pointer_capture()
         # Paint the first frame synchronously: the latency probe measures the
         # time from mouse-down to the first painted frame.
         self.repaint()
         if not self._timer.isActive():
             self._timer.start()
+
+    def warm_up(self) -> None:
+        """Pay the first-gesture costs now, invisibly.
+
+        The first wheel of a session costs about 100 ms (native window, backing
+        store, font database, glyph cache) while later ones cost about 5 ms.
+        Nothing is competing for the mouse at start-up, so paying that cost here
+        shrinks the window in which the application underneath can start a drag
+        before the capture is taken.
+
+        Two separate paths are warmed, and neither can be seen:
+
+        1. the native surface, by showing the window once while it paints only a
+           fully transparent frame (nothing is drawn when no wheel is open);
+        2. the painting path, by rendering a complete wheel into an offscreen
+           image, which initialises the font database, glyph cache, icon paths
+           and text metrics.
+
+        Window opacity is deliberately *not* used: a platform plugin that ignores
+        it would flash a full-screen wheel at start-up.
+        """
+        if self.isVisible() or self._open or self._marks:
+            return
+        try:
+            # 1. native surface
+            self._apply_geometry()
+            self.show()
+            self.repaint()
+            self.hide()
+
+            # 2. painting path, offscreen and invisible
+            self._open = True
+            self._hover = min(1, self._count - 1)
+            self._weights = [1.0] * self._count
+            self._opened_at = time.perf_counter() - 1.0  # open animation finished
+            image = QImage(
+                max(1, self.width()),
+                max(1, self.height()),
+                QImage.Format_ARGB32_Premultiplied,
+            )
+            image.fill(Qt.transparent)
+            painter = QPainter(image)
+            try:
+                painter.setRenderHint(QPainter.Antialiasing, True)
+                painter.setRenderHint(QPainter.TextAntialiasing, True)
+                self._paint_wheel(painter, time.perf_counter())
+            finally:
+                painter.end()
+            self._warmed = True
+        except Exception:  # pragma: no cover - never let a warm-up break startup
+            log.debug("overlay warm-up failed", exc_info=True)
+        finally:
+            self._open = False
+            self._hover = -1
+            self._weights = [0.0] * self._count
+            self._marks.clear()
+            if self.isVisible():
+                self.hide()
+
+    @property
+    def warmed_up(self) -> bool:
+        """Whether the disposable first-gesture costs have been paid."""
+        return self._warmed
+
+    # ----------------------------------------------------------- mouse capture
+    # The press that opens the wheel has already been delivered to whatever was
+    # under the cursor, because a global observer cannot withhold input. What can
+    # be fixed is the rest of the gesture: by taking the mouse capture, Windows
+    # sends WM_CAPTURECHANGED to the application that received the press, and
+    # well-behaved applications abort the drag or selection they had started. The
+    # move and the release then arrive at this window and never complete a click
+    # in the window underneath.
+    def _take_pointer_capture(self) -> None:
+        if _USER32 is None:
+            return
+        try:
+            _USER32.SetCapture(int(self.winId()))
+            self._captured = True
+        except Exception:  # pragma: no cover - platform/window edge case
+            log.debug("SetCapture failed", exc_info=True)
+
+    def _release_pointer_capture(self) -> None:
+        self._captured = False
+        if _USER32 is None:
+            return
+        try:
+            _USER32.ReleaseCapture()
+        except Exception:  # pragma: no cover
+            log.debug("ReleaseCapture failed", exc_info=True)
 
     def cancel(self) -> None:
         """Close the wheel without a ping; emits ``cancelled`` if it was open."""
@@ -248,6 +352,7 @@ class OverlayWindow(QWidget):
         self._open = False
         self._hover = -1
         self._weights = [0.0] * self._count
+        self._release_pointer_capture()
         self.cancelled.emit()
         self._finish_if_idle()
 
@@ -273,6 +378,7 @@ class OverlayWindow(QWidget):
         self._open = False
         self._hover = -1
         self._weights = [0.0] * self._count
+        self._release_pointer_capture()
         self.repaint()
         self.committed.emit(name)
         return name
@@ -365,6 +471,7 @@ class OverlayWindow(QWidget):
         self._hover = -1
         self._weights = [0.0] * self._count
         self._marks.clear()
+        self._release_pointer_capture()  # defensive: never leave the mouse captured
         super().hideEvent(event)
 
     def closeEvent(self, event) -> None:  # noqa: N802 - Qt name
@@ -387,6 +494,7 @@ class OverlayWindow(QWidget):
         self._hover = -1
         self._marks.clear()
         self._weights = [0.0] * self._count
+        self._release_pointer_capture()
         try:
             self.hide()
             self.close()
@@ -782,6 +890,21 @@ class OverlayManager(QObject):
                 log.debug("cannot connect to QGuiApplication screen signals", exc_info=True)
 
     # ------------------------------------------------------------------ public
+    def warm_up(self) -> None:
+        """Create and pre-paint one window per screen.
+
+        Called once at start-up. It moves the first-gesture cost (native window
+        creation, backing store, font and glyph caches - measured at about 100 ms
+        against 5 ms for later gestures) to a moment when no gesture is in
+        flight, which closes most of the race that let the application underneath
+        start a drag before the capture was taken.
+        """
+        for screen in QGuiApplication.screens():
+            try:
+                self._window_for(screen).warm_up()
+            except Exception:  # pragma: no cover - a broken screen must not stop start-up
+                log.debug("warm-up failed for screen %r", screen, exc_info=True)
+
     def set_config(self, config: Config) -> None:
         """Store the config and let every live window pick it up immediately."""
         self._config = config
