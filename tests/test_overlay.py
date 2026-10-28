@@ -26,6 +26,16 @@ from lolping.overlay import OverlayManager, OverlayWindow  # noqa: E402
 _APP = None
 
 
+class _CentreCursor:
+    """QCursor stand-in that always reports the wheel centre (no movement)."""
+
+    def __init__(self, point: QPoint) -> None:
+        self._point = point
+
+    def pos(self) -> QPoint:
+        return QPoint(self._point)
+
+
 class _FakeUser32:
     """Records the capture calls instead of talking to the real window manager."""
 
@@ -162,6 +172,55 @@ class TestWarmUp(unittest.TestCase):
             self.assertFalse(manager.is_open())
         finally:
             manager.shutdown()
+
+
+class TestClickPing(unittest.TestCase):
+    """A click in place sends the centre ping; a drag ending in the centre cancels."""
+
+    def setUp(self) -> None:
+        global _APP
+        _APP = QApplication.instance() or QApplication([])
+        self._original_user32 = overlay_module._USER32
+        self._original_cursor = overlay_module.QCursor
+        overlay_module._USER32 = _FakeUser32()  # type: ignore[assignment]
+        self.centre = QPoint(400, 300)
+        overlay_module.QCursor = _CentreCursor(self.centre)  # type: ignore[assignment]
+
+    def tearDown(self) -> None:
+        overlay_module._USER32 = self._original_user32  # type: ignore[assignment]
+        overlay_module.QCursor = self._original_cursor  # type: ignore[assignment]
+
+    def _window(self, **overrides) -> OverlayWindow:
+        config = Config(**overrides)
+        window = OverlayWindow(_APP.primaryScreen(), config)
+        self.addCleanup(window.shutdown)
+        return window
+
+    def test_click_without_movement_commits_the_basic_ping(self) -> None:
+        window = self._window()
+        window.begin(self.centre)
+        self.assertEqual(window.commit(), "Ping")
+        self.assertFalse(window.is_open())
+
+    def test_drag_back_to_the_centre_still_cancels(self) -> None:
+        window = self._window()
+        window.begin(self.centre)
+        window._max_distance = 80.0  # the pointer travelled out and came back
+        self.assertIsNone(window.commit())
+        self.assertFalse(window.is_open())
+
+    def test_click_ping_can_be_disabled(self) -> None:
+        window = self._window(click_places_ping=False)
+        window.begin(self.centre)
+        self.assertIsNone(window.commit())
+
+    def test_commit_emits_the_basic_ping_name(self) -> None:
+        window = self._window()
+        seen: list[str] = []
+        window.committed.connect(seen.append)
+        window.begin(self.centre)
+        window.commit()
+        self.assertEqual(seen, ["Ping"])
 
 
 if __name__ == "__main__":

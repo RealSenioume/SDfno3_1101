@@ -24,11 +24,13 @@ APP_NAME = "lolping-desktop"
 
 MODIFIER_NAMES: tuple[str, ...] = ("ctrl", "alt", "shift", "win")
 MOUSE_BUTTONS: tuple[str, ...] = ("left", "right", "middle", "x1", "x2")
-THEMES: tuple[str, ...] = ("gold", "blue", "red")
+THEMES: tuple[str, ...] = ("gold", "blue", "red", "lol")
 
 SECTOR_COUNT = 8
 
-# Clockwise from 3 o'clock, matching the original prototype's layout.
+# Clockwise from 3 o'clock, matching the League of Legends wheel
+# (12 o'clock is Danger). The original prototype used "Retreat" at 12 o'clock;
+# v0.3.2 aligns the defaults with the reference layout.
 DEFAULT_SECTORS: tuple[str, ...] = (
     "On My Way",
     "All-In",
@@ -36,7 +38,7 @@ DEFAULT_SECTORS: tuple[str, ...] = (
     "Need Vision",
     "Enemy Missing",
     "Enemy Vision",
-    "Retreat",
+    "Danger",
     "Push",
 )
 
@@ -50,7 +52,7 @@ DEFAULT_SECTOR_ICONS: tuple[str, ...] = (
     "vision",
     "missing",
     "enemy_vision",
-    "retreat",
+    "danger",
     "push",
 )
 
@@ -87,6 +89,9 @@ class Config:
 
     trigger_modifiers: list[str] = field(default_factory=lambda: ["alt"])
     trigger_mouse_button: str = "left"
+    #: A click without dragging sends the centre (basic) ping instead of
+    #: cancelling, which is how the reference wheel behaves.
+    click_places_ping: bool = True
     #: Withhold the trigger gesture from other windows (native low-level hook).
     #: On, Alt + click is reserved system wide while lolping runs.
     suppress_trigger_gesture: bool = True
@@ -134,6 +139,9 @@ class Config:
         )
         config.trigger_mouse_button = _choice(
             data.get("trigger_mouse_button"), MOUSE_BUTTONS, config.trigger_mouse_button
+        )
+        config.click_places_ping = _flag(
+            data.get("click_places_ping"), config.click_places_ping
         )
         config.wheel_radius = int(
             _number(data.get("wheel_radius"), 60, 400, config.wheel_radius)

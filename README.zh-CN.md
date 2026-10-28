@@ -21,6 +21,8 @@
 
 ## 功能
 
+- 两套轮盘外观：原有的灰金风格，以及一个参考《英雄联盟》的 `lol` 主题（金色分隔线、向外光束、带 PING / BACK 的中央徽章）。扇区图标可以用本地 PNG 替换；仓库本身不附带任何图标素材（见 `assets/icons/ICONS.md`）。
+- 不拖动的单击会发送中央（基础）ping；拖动后在死区内松开仍然取消。
 - 八扇区径向菜单，通过"按住并拖动"的手势在鼠标位置展开（默认：按住 **Alt + 鼠标左键**）。
 - 默认扇区（从 3 点钟方向顺时针）：On My Way、All-In、Assist Me、Need Vision、
   Enemy Missing、Enemy Vision、Retreat、Push。八个扇区都可重命名。

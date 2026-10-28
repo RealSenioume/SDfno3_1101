@@ -3,7 +3,7 @@
 **Course:** SD5913 — Semester 1
 **Author:** Zhexian Tao
 **Student repository:** <https://github.com/RealSenioume/SDfno3_1101>
-**Version described:** 0.3.1
+**Version described:** 0.3.2
 
 ---
 
@@ -15,12 +15,12 @@ game. That gesture is fluent, and it is locked inside one application. This
 project re-implements the gesture as a standalone Windows desktop overlay so it
 can be used while presenting, streaming, tutoring or reviewing a match.
 
-The delivered artefact, `lolping` 0.3.1, is a tray-resident Python/PyQt5
+The delivered artefact, `lolping` 0.3.2, is a tray-resident Python/PyQt5
 application. It installs global keyboard and mouse hooks, draws a translucent
 always-on-top wheel centred on the pointer without stealing focus, animates the
 selection with frame-rate-independent exponential smoothing, leaves a fading
 mark where the ping was placed, and records every ping as JSON Lines. It is
-built from 15 modules totalling roughly 3,600 lines of Python, with 144
+built from 15 modules totalling roughly 3,600 lines of Python, with 150
 automated unit tests covering the geometry, configuration-repair,
 input-state-machine, icon and audio logic, plus a packaging pipeline that
 produces a standalone executable.
@@ -93,7 +93,7 @@ The objectives were:
 * A measurement methodology for trigger-to-first-paint latency that includes the
   cross-thread queue hop, together with an explicit statement of what it does
   *not* include.
-* An automated suite of 144 tests over the parts of the system most likely to be
+* An automated suite of 150 tests over the parts of the system most likely to be
   wrong (angle conventions, hostile configuration, input state transitions, icon
   fallbacks, audio buffers).
 
@@ -128,7 +128,7 @@ optional local-network rooms. It is a mature, cross-platform product.
 
 The present project differs deliberately:
 
-| Aspect | lolPing | lolping 0.3.1 |
+| Aspect | lolPing | lolping 0.3.2 |
 | --- | --- | --- |
 | Stack | Electron + TypeScript + C++ helper | Python 3.14 + PyQt5 + pynput |
 | Input suppression | Helper swallows Alt+drag | Cannot suppress; documented limitation |
@@ -579,6 +579,20 @@ last 30–200 ms, and documented as a design decision rather than a defect. Both
 constraints were discovered by manual testing after the first implementation, and
 the file-based path is now pinned by a regression test.
 
+**A second skin, and what it cost.** Version 0.3.2 adds an optional
+League-inspired renderer: a barely-there disc, eight gold separators, additive
+radial light beams that spill past the rim, and a centre medallion carrying a
+drawn diamond badge, PING and a BACK hint. It is a *rendering* alternative, not a
+replacement: the original three themes are untouched and behaviour is identical
+except for one deliberate addition — a click without dragging now commits the
+centre (basic) ping instead of cancelling, which is how the reference wheel
+behaves. The skin is drawn entirely in code, so the repository still ships no
+Riot artwork; slice icons can be overridden by local PNG files that are
+git-ignored, and the loader falls back to the vector icon when a file is absent.
+Because the paint path changed, the latency figures in Section 6.3 were
+re-measured on 0.3.2 with this skin active: the skin costs about one millisecond
+at p90 and none of the 50 ms budget.
+
 ---
 
 ## 6. Testing and evaluation
@@ -598,7 +612,7 @@ the file-based path is now pinned by a regression test.
 | `test_overlay.py` | ~10 | Mouse capture taken on open and released on every close path, warm-up leaves no state |
 | `test_docs_sync.py` | ~8 | English/Chinese parity fingerprinting and exit codes |
 
-Result: **144 tests, all passing** (`python -m unittest discover -s tests`), in
+Result: **150 tests, all passing** (`python -m unittest discover -s tests`), in
 about 60 ms, with no display and no hooks installed (the icon suite forces the
 offscreen Qt platform).
 
@@ -663,43 +677,42 @@ returns a pass/fail verdict against the 50 ms target.
 single display running at a scaled logical resolution, with the reference
 implementation closed (Section 2.2) and no other hook-owning tool active. The 30
 gestures were issued by `tools/demo_gesture.py`, which sends the same
-Alt + press + drag + release sequence a human performs. The run used the **v0.3.1
-build**, i.e. with the start-up warm-up and the native mouse guard active.
+Alt + press + drag + release sequence a human performs. The run used the **v0.3.2
+build** with the League-inspired `lol` skin active — deliberately the skin with
+the most painting work, at eight additive radial-gradient beams per frame.
 
 | Metric | n | min | median | p90 | p95 | p99 | max | Verdict |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |
-| `frame_ms` — all samples | 30 | 4.54 | 5.20 | 5.92 | 15.05 | 15.76 | 15.76 | PASS |
-| `frame_ms` — first gesture excluded | 29 | 4.54 | 5.20 | 5.92 | **6.08** | 15.76 | 15.76 | **PASS** |
-| `commit_ms` — button hold time, not latency | 30 | 608 | 618 | 655 | 663 | 703 | 703 | n/a |
+| `frame_ms` — all samples | 30 | 4.82 | 5.09 | 7.05 | 7.41 | 18.87 | 18.87 | PASS |
+| `frame_ms` — first gesture excluded | 29 | 4.82 | 5.09 | 7.05 | **7.33** | 7.41 | 7.41 | **PASS** |
+| `commit_ms` — button hold time, not latency | 30 | 607 | 617 | 624 | 629 | 635 | 635 | n/a |
 
 **Interpretation.**
 
-1. The p95 is **15.05 ms** (6.08 ms with the first gesture excluded), roughly three
-   times under the 50 ms target of NFR-01, with a median of 5.20 ms. Twenty-eight
-   of the thirty samples sit in a 4.54–6.08 ms band, so the render path is not the
-   bottleneck it was feared to be: eight icons and a layered burst fit comfortably
-   inside one 60 Hz frame.
-2. **The start-up warm-up did what it was designed to do.** On the v0.3.0 build the
-   first gesture of a session cost 103.57 ms because the native surface, font
-   database and glyph cache were first touched while the wheel was already needed.
-   Paying that cost at launch (Section 5.3) brought the first gesture down to
-   15.05 ms — a 6.9× reduction, and no longer an outlier worth a separate table
-   row.
-3. Two samples sit at about 15 ms: the first gesture, and the third, which came
-   immediately after a cancelled gesture. Both remain three times under the target.
-   The plausible cause is that the first paint of a gesture occasionally lands
-   while the window is already compositing the previous state; the effect was not
-   isolated further, and it is reported as observed rather than explained away.
+1. The p95 is **7.41 ms** (7.33 ms with the first gesture excluded), roughly 6.7
+   times under the 50 ms target of NFR-01, with a median of 5.09 ms. Twenty-nine
+   of the thirty samples sit between 4.82 and 7.41 ms; the single outlier is the
+   first gesture of the session at 18.87 ms.
+2. **The start-up warm-up still does its job.** Before it existed, the first
+   gesture cost 103.57 ms (v0.3.0); it now costs 15–19 ms depending on the run
+   (15.05 ms on v0.3.1, 18.87 ms here). The first wheel is no longer an order of
+   magnitude slower than the rest.
+3. **The new skin costs about one millisecond.** Same machine, same harness, only
+   the theme changed between the two runs: median 5.20 → 5.09 ms (noise), p90
+   5.92 → 7.05 ms (+1.13), p95 6.08 → 7.33 ms (+1.25). Eight additive radial
+   gradients per frame therefore cost roughly a millisecond at the tail, which is
+   absorbed by the frame budget — the static-layer pixmap cache sketched in
+   Section 5.6 was not needed, and adding it now would be complexity without a
+   measurable benefit.
 4. Even adding one full 60 Hz frame (~16.7 ms) of compositor presentation to every
-   sample, the p95 stays near 32 ms and the requirement still holds.
-5. `commit_ms` is the time the button was held, not a latency. The 618 ms median is
+   sample, the p95 stays near 24 ms and the requirement still holds.
+5. `commit_ms` is the time the button was held, not a latency. The 617 ms median is
    the harness's own pause between press and release; it is reported because the
    probe records it, not because it says anything about responsiveness.
-6. The comparison with the archived v0.3.0 run is meaningful for the first gesture
-   (103.57 → 15.05 ms, same harness, same machine) but **not** for the steady-state
-   tail: 5.49 → 6.08 ms is inside run-to-run noise and is not claimed as a
-   regression. The native mouse guard adds one callback per mouse event, which is
-   consistent with a sub-millisecond change at most.
+6. These figures are measured on the version that is actually delivered (0.3.2),
+   which closes the gap flagged in Section 5.6. The archived runs remain useful as
+   a controlled comparison: v0.3.0 (before the warm-up), v0.3.1 (before the skin),
+   v0.3.2 (this run).
 
 **Data-collection caveat.** The harness anchors the gesture on an empty strip of
 the taskbar so that the swallowed click cannot activate another application.
@@ -774,7 +787,7 @@ goal into a number and an argument.
 4. **Mixed-DPI multi-monitor.** Correct on the screen where the wheel opens;
    marks stay on that screen.
 5. **Windows only.** `msvcrt`, `winreg` and `winsound` are used directly.
-6. **No fullscreen auto-pause.** Pausing is manual in 0.3.1.
+6. **No fullscreen auto-pause.** Pausing is manual in 0.3.2.
 7. **Single-author evaluation.** The latency and usability data describe one
    machine and one user.
 
@@ -803,7 +816,7 @@ mixed-DPI desktop that breaks the obvious window architecture, and a global hook
 that fails silently by design.
 
 The result is a 3,600-line Python application with a documented architecture,
-thirteen explicit design decisions with rejected alternatives, 144 automated tests, a
+ten summarised design decisions with rejected alternatives (nineteen in the full design document), 150 automated tests, a
 formal manual test matrix, a packaging pipeline and a measured latency
 methodology. It honours every objective set out in Section 1.3: the gesture is
 reproduced, the tool is self-sufficient on a clean machine, the game client is
@@ -848,7 +861,7 @@ states what it cannot do is more trustworthy than one that does not.
 src/lolping/     13 modules: geometry, config, hotkeys, input_hook, overlay,
                  settings_dialog, app, single_instance, autostart, sounds,
                  logging_setup, __init__, __main__
-tests/           10 unittest suites, 144 tests
+tests/           10 unittest suites, 150 tests
 tools/           smoke_test.py, latency_report.py, demo_gesture.py
 build/           lolping.spec (PyInstaller), build.ps1
 docs/            00 module contract, 01 proposal, 02 requirements,

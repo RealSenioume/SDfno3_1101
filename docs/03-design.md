@@ -1,6 +1,6 @@
 # lolping — Design Document
 
-Version 0.3.1 · Windows 11 · Python 3.14 · PyQt5 5.15.11 · pynput 1.8.2
+Version 0.3.2 · Windows 11 · Python 3.14 · PyQt5 5.15.11 · pynput 1.8.2
 
 This document explains *how* the system is built and *why* it is built that way.
 Requirements live in [`02-requirements.md`](02-requirements.md), the test
@@ -489,7 +489,7 @@ expected results (`docs/04-test-plan.md`, TC-28 … TC-30).
 | `trigger_mouse_button` | str | `"left"` | left/right/middle/x1/x2 |
 | `wheel_radius` | int | 130 | 60–400 |
 | `dead_zone` | int | 34 | 5–(`wheel_radius`−20) |
-| `sector_count` | int | 8 | fixed in 0.3.1 |
+| `sector_count` | int | 8 | fixed in 0.3.2 |
 | `sectors` | list[str] | LoL-style names | length == `sector_count` |
 | `animation_tau` | float | 0.035 | 0.005–0.5 s |
 | `mark_duration_ms` | int | 900 | 300–4000 |
@@ -646,7 +646,7 @@ Design-inherent, documented rather than hidden:
    desktop can still start a selection or an icon drag.
 4. Mixed-DPI multi-monitor: correct on the active screen only.
 5. Windows only — `msvcrt`, `winreg`, `winsound` are used directly.
-6. Pause is manual; fullscreen-app auto-pause is not implemented in 0.3.1.
+6. Pause is manual; fullscreen-app auto-pause is not implemented in 0.3.2.
 7. Sound cues cannot overlap: `winsound` stops the previous asynchronous sound
    when a new one starts. Documented as a trade-off; with 28–200 ms cues the
    audible effect is negligible.
@@ -677,3 +677,30 @@ Ordered by value per effort:
 | NFR-09 … NFR-12 (portability, DPI, multi-monitor) | §8 | TC-28 … TC-30 |
 | FR-23 … FR-28 (icons, animations, sound) | §7.6, §7.7, §7.8 | TC-31 … TC-36 |
 | NFR-13, NFR-14 (icon frame cost, synthesis cost) | §7.6, §7.8 | frame-time and synthesis timing in `docs/04-test-plan.md` |
+
+## 16. v0.3.2 addendum: the League-inspired skin
+
+The skin is a second renderer behind the same state machine, selected by
+`Config.theme == "lol"`; the original themes keep their code path untouched.
+
+* **Light beams.** Each slice draws a radial-gradient pie out to 1.38 R with
+  `CompositionMode_Plus`, so the light adds to whatever is behind the overlay
+  instead of covering it. The hovered slice's beam is brighter (40 -> 110
+  alpha), which is the only hover cue in this skin.
+* **Gold structure.** Eight separators run from the medallion rim to the wheel
+  rim, plus a thin outer rim and a double medallion rim. All drawn, no assets.
+* **Medallion.** Radial-gradient disc, a drawn blue diamond badge, `PING`, and a
+  `BACK` hint with a small mouse glyph. 0.46 R, with icons moved to 0.65 R.
+* **Icon override chain.** per-slice `sector_images[i]` -> local
+  `assets/icons/<icon id>.png` -> built-in vector icon. The image lookup is
+  cached including the absent result, so a missing file costs no per-frame IO.
+* **Click threshold.** `_max_distance` tracks the furthest pointer travel from
+  the centre during the gesture; a release with travel <= 8 px commits the
+  basic ping, anything further that ends in the dead zone cancels. Tracking the
+  maximum (not the release position) distinguishes a click from a drag that
+  returns to the centre.
+
+| # | Decision | Alternative | Consequence |
+| --- | --- | --- | --- |
+| D18 | Ship no icon art; allow local, git-ignored PNG overrides | Bundle downloaded icons | The repository stays licence-clean; a fresh clone shows vector icons until the user adds files |
+| D19 | Click without drag sends the basic ping (on by default) | Click always cancels | Matches the reference interaction; can be switched off in Settings |

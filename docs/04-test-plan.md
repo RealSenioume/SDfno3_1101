@@ -1,8 +1,8 @@
-# 4. Test plan — lolping v0.3.1
+# 4. Test plan — lolping v0.3.2
 
 ## 4.1 Purpose and scope
 
-This plan describes how lolping v0.3.1 is verified against
+This plan describes how lolping v0.3.2 is verified against
 `docs/02-requirements.md`: unit tests of the pure logic, system tests of the
 complete application on a documented Windows matrix, and measurement protocols
 for the non-functional requirements. Build verification is covered by
@@ -270,3 +270,13 @@ section 6 of the report.
 | FR-27 | TC-24, TC-34 |
 | FR-28 | TC-35 |
 | NFR-13, NFR-14 | PT-05 (4.7.5) |
+
+## 9. v0.3.2 test cases
+
+| # | Case | Expected |
+| --- | --- | --- |
+| TC-37 | Alt + click without moving | Wheel closes, one `Ping` line in `pings.jsonl`, basic ping mark |
+| TC-38 | Alt + drag out and back to the centre, release | Cancels, no log line |
+| TC-39 | Theme = `lol` | Gold separators, beams, medallion with PING / BACK; no image file needed |
+| TC-40 | Drop `danger.png` into `assets/icons/`, restart | The 12 o'clock slice shows the image; deleting the file restores the vector icon |
+| TC-41 | Switch back to a legacy theme | The original grey/gold look returns, unaffected by the skin |

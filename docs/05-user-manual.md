@@ -1,4 +1,4 @@
-# 5. User manual — lolping v0.3.1
+# 5. User manual — lolping v0.3.2
 
 ## 5.1 What lolping is
 
@@ -254,7 +254,7 @@ listed in section 5.10, and it stays on your machine.
 
 - Exclusive-fullscreen applications and elevated windows can prevent the
   overlay from appearing (see Troubleshooting).
-- lolping has eight fixed sectors in v0.3.1.
+- lolping has eight fixed sectors in v0.3.2.
 - Sound cues cannot overlap: a new cue stops the previous one (see section 5.8).
 - The mouse button is seen by the window underneath before the wheel can appear,
   because a program cannot withhold input without a native hook. lolping installs
@@ -268,3 +268,21 @@ listed in section 5.10, and it stays on your machine.
 - Windows 11 only.
 - It does not know about the game: the labels are generic and nothing is sent to
   teammates.
+
+## 5.15 Wheel skins, click ping and local icons (v0.3.2)
+
+**Theme.** Settings -> Wheel -> *Theme* offers `Gold`, `Blue`, `Red` and
+`League style (lol)`. The last one draws gold separators, outward light beams
+and a centre medallion with `PING` / `BACK`; it is drawn in code and needs no
+extra files. The other three themes are unchanged.
+
+**Click ping.** Settings -> Trigger -> *Click without dragging sends a basic
+ping* (on by default). Press and release without moving to send the centre
+ping; drag out and release inside the dead zone to cancel. Right-click or Esc
+cancel at any time.
+
+**Local icons.** The `lol` theme looks best with the real ping icons, but those
+are Riot Games artwork and are not shipped. Save your own PNGs as
+`<icon id>.png` (for example `danger.png`) in `assets/icons/`; the folder is
+git-ignored and the loader falls back to the built-in vector icon when a file
+is missing. `assets/icons/ICONS.md` lists every file name.

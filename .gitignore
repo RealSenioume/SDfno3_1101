@@ -15,3 +15,8 @@ release/
 .tmp/
 .venv-build/
 build/_work/
+
+# Local-only icon art: Riot-owned images stay on the user's disk, never in Git
+assets/icons/*.png
+assets/icons/*.ico
+assets/icons/*.jpg

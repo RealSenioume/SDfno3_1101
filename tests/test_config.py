@@ -82,6 +82,17 @@ class TestDefaults(unittest.TestCase):
         self.assertEqual(config.sectors, list(DEFAULT_SECTORS))
         self.assertTrue(5 <= config.dead_zone < config.wheel_radius)
 
+    def test_sector_six_matches_the_reference_wheel(self) -> None:
+        # The League wheel has Danger at 12 o'clock; the prototype had Retreat.
+        self.assertEqual(Config().sectors[6], "Danger")
+        self.assertEqual(Config().sector_icons[6], "danger")
+
+    def test_click_places_ping_defaults_on_and_round_trips(self) -> None:
+        self.assertTrue(Config().click_places_ping)
+        config = Config(click_places_ping=False)
+        self.assertFalse(Config.from_dict(config.to_dict()).click_places_ping)
+        self.assertTrue(Config.from_dict({"click_places_ping": "yes"}).click_places_ping)
+
     def test_paths_live_under_one_directory(self) -> None:
         root = _make_temp_dir()
         previous = os.environ.get("APPDATA")

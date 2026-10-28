@@ -62,6 +62,7 @@ THEME_LABELS: dict[str, str] = {
     "gold": "Gold",
     "blue": "Blue",
     "red": "Red",
+    "lol": "League style (lol)",
 }
 
 _RADIUS_MIN = 60
@@ -122,6 +123,7 @@ class SettingsDialog(QDialog):
                 self._button_combo.currentData() or self._base_config.trigger_mouse_button
             ),
             suppress_trigger_gesture=bool(self._suppress_check.isChecked()),
+            click_places_ping=bool(self._click_ping_check.isChecked()),
             wheel_radius=radius,
             dead_zone=dead_zone,
             sector_count=SECTOR_COUNT,
@@ -233,6 +235,13 @@ class SettingsDialog(QDialog):
             "other applications."
         )
         layout.addWidget(self._suppress_check)
+
+        self._click_ping_check = QCheckBox("Click without dragging sends a basic ping", group)
+        self._click_ping_check.setToolTip(
+            "A press and release without moving places the centre ping. Turn this "
+            "off if a click should always cancel the wheel instead."
+        )
+        layout.addWidget(self._click_ping_check)
         return group
 
     def _build_wheel_group(self, parent: QWidget) -> QGroupBox:
@@ -441,6 +450,7 @@ class SettingsDialog(QDialog):
         self._button_combo.setCurrentIndex(button_index if button_index >= 0 else 0)
 
         self._suppress_check.setChecked(bool(config.suppress_trigger_gesture))
+        self._click_ping_check.setChecked(bool(config.click_places_ping))
 
         radius = min(max(int(config.wheel_radius), _RADIUS_MIN), _RADIUS_MAX)
         self._radius_slider.setValue(radius)

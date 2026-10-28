@@ -45,6 +45,8 @@ from PyQt5.QtGui import (
     QPainterPath,
     QPaintEvent,
     QPen,
+    QPolygonF,
+    QRadialGradient,
     QScreen,
 )
 from PyQt5.QtWidgets import QWidget
@@ -69,6 +71,7 @@ THEME_ACCENTS: dict[str, tuple[int, int, int]] = {
     "gold": (220, 180, 60),
     "blue": (90, 160, 240),
     "red": (230, 90, 80),
+    "lol": (198, 168, 96),
 }
 
 _DEFAULT_ACCENT = THEME_ACCENTS["gold"]
@@ -96,6 +99,22 @@ _ICON_RADIUS_FACTOR = 0.60  # icon centre, as a fraction of the slice radius
 _ICON_HOVER_GROWTH = 0.10  # hovered icon is 10 % bigger
 _ICON_IDLE_COLOUR = (235, 235, 235)
 _ICON_IDLE_ALPHA = 200
+
+# --- v0.3.2 "lol" skin (League-inspired) ---------------------------------------
+_LOL_MEDALLION_FACTOR = 0.46  # centre medallion radius, as a fraction of R
+_LOL_BEAM_REACH = 1.38  # radial light beams extend past the wheel rim
+_LOL_BEAM_IDLE = 40  # beam opacity for a slice that is not hovered
+_LOL_BEAM_HOVER = 70  # extra beam opacity for the hovered slice
+_LOL_DISC_ALPHA = 26  # barely-there dark disc that reads as the wheel surface
+_LOL_GOLD = (198, 168, 96)
+_LOL_LINE_ALPHA = 130  # slice separators
+_LOL_RING_ALPHA = 110  # outer rim and medallion rim
+_LOL_ICON_FACTOR = 0.65  # icon centre, as a fraction of R
+_LOL_ICON_COLOUR = (214, 192, 140)
+
+# --- v0.3.2 click-to-ping ------------------------------------------------------
+_CLICK_MAX_DISTANCE = 8.0  # travel from the centre still treated as a click
+_BASIC_PING_NAME = "Ping"  # the centre action's name in logs and marks
 
 # --- v0.3 release burst --------------------------------------------------------
 _BURST_ANGLES = (-18.0, -9.0, 0.0, 9.0, 18.0)  # degrees around the slice centre
@@ -143,6 +162,7 @@ class OverlayWindow(QWidget):
         self._opened_at = 0.0
         self._captured = False
         self._warmed = False
+        self._max_distance = 0.0  # furthest the pointer travelled this gesture
 
         self._setup_window()
 
@@ -241,6 +261,7 @@ class OverlayWindow(QWidget):
         self._weights = [0.0] * self._count
         self._last_tick = time.perf_counter()
         self._opened_at = self._last_tick  # drives the 0.13 s open animation
+        self._max_distance = 0.0
 
         # Take the capture before painting. Every millisecond between the press
         # and the capture is a millisecond in which the application underneath
@@ -366,6 +387,14 @@ class OverlayWindow(QWidget):
             return None
         index = self._hovered_sector()
         if index < 0:
+            # No slice: either the user clicked in place (basic ping, like the
+            # reference tool's "Alt + click places a ping") or released inside
+            # the dead zone after dragging, which cancels.
+            if (
+                self._config.click_places_ping
+                and self._max_distance <= _CLICK_MAX_DISTANCE
+            ):
+                return self._commit_basic_ping()
             self.cancel()
             return None
 
@@ -382,6 +411,18 @@ class OverlayWindow(QWidget):
         self.repaint()
         self.committed.emit(name)
         return name
+
+    def _commit_basic_ping(self) -> str:
+        """Commit the centre action: a click without dragging."""
+        centre = QPoint(self._center)
+        self.add_mark(_BASIC_PING_NAME, centre, -1)
+        self._open = False
+        self._hover = -1
+        self._weights = [0.0] * self._count
+        self._release_pointer_capture()
+        self.repaint()
+        self.committed.emit(_BASIC_PING_NAME)
+        return _BASIC_PING_NAME
 
     def add_mark(self, name: str, global_pos: QPoint, sector: int = -1) -> None:
         """Animate a ping burst at ``global_pos``.
@@ -434,6 +475,14 @@ class OverlayWindow(QWidget):
                 self._hover = hover
                 # Sound layer in app.py listens to this; emit only on changes.
                 self.hover_changed.emit(hover)
+            # Track how far the pointer ever travelled from the centre: a release
+            # near the centre after a real drag is a cancel, a release near the
+            # centre without moving is a click and sends the basic ping.
+            cursor = QCursor.pos()
+            travelled = math.hypot(
+                cursor.x() - self._center.x(), cursor.y() - self._center.y()
+            )
+            self._max_distance = max(self._max_distance, travelled)
             tau = max(float(self._config.animation_tau), 0.001)
             weights = self._weights
             for index in range(self._count):
@@ -602,11 +651,219 @@ class OverlayWindow(QWidget):
                     painter.restore()
                 return
 
+        icon_id = assets.resolve_icon(config.sector_icons, index)
+        # A PNG in the user's local icon folder overrides the vector icon; the
+        # file is git-ignored, so the repository itself still ships no artwork.
+        pixmap = assets.load_icon_image(
+            icon_id, max(1, int(round(size))), self._device_pixel_ratio()
+        )
+        if pixmap is not None and not pixmap.isNull():
+            ratio = float(pixmap.devicePixelRatio()) or 1.0
+            painter.save()
+            try:
+                painter.setOpacity(clamp(opacity, 0.0, 1.0))
+                painter.drawPixmap(
+                    QPointF(
+                        cx - pixmap.width() / ratio / 2.0,
+                        cy - pixmap.height() / ratio / 2.0,
+                    ),
+                    pixmap,
+                )
+            finally:
+                painter.restore()
+            return
+
         assets.draw_icon(
             painter,
-            assets.resolve_icon(config.sector_icons, index),
+            icon_id,
             QRectF(cx - size / 2.0, cy - size / 2.0, size, size),
             colour,
+        )
+
+    # ------------------------------------------------------------- lol skin
+    def _paint_lol_wheel(
+        self,
+        painter: QPainter,
+        now: float,
+        cx: float,
+        cy: float,
+        base_radius: float,
+        ease: float,
+    ) -> None:
+        """League-inspired skin: light beams, gold separators and a medallion.
+
+        Deliberately asset-free: every shape is drawn, so switching to this theme
+        never depends on files that the repository must not contain. Slice names
+        are not painted here - in this skin the meaning is carried by the icons
+        and the centre medallion, which is also how the reference layout works.
+        """
+        config = self._config
+        count = self._count
+        weights = self._weights
+        accent = self._accent()
+        scale = _OPEN_START_SCALE + (1.0 - _OPEN_START_SCALE) * ease
+        radius = base_radius * scale
+        medallion = radius * _LOL_MEDALLION_FACTOR
+        beam_reach = radius * _LOL_BEAM_REACH
+
+        # 1) Radial light beams. Additive blending makes them read as light
+        #    spilling over the desktop instead of as opaque wedges.
+        painter.save()
+        try:
+            painter.setCompositionMode(QPainter.CompositionMode_Plus)
+            painter.setPen(Qt.NoPen)
+            for index in range(count):
+                weight = weights[index]
+                gradient = QRadialGradient(QPointF(cx, cy), beam_reach)
+                inner = QColor(accent)
+                inner.setAlpha(
+                    int(round((_LOL_BEAM_IDLE + _LOL_BEAM_HOVER * weight) * ease))
+                )
+                middle = QColor(accent)
+                middle.setAlpha(
+                    int(round((_LOL_BEAM_IDLE * 0.45 + _LOL_BEAM_HOVER * 0.5 * weight) * ease))
+                )
+                outer = QColor(accent)
+                outer.setAlpha(0)
+                gradient.setColorAt(0.0, middle)
+                gradient.setColorAt(0.55, inner)
+                gradient.setColorAt(0.82, middle)
+                gradient.setColorAt(1.0, outer)
+                painter.setBrush(gradient)
+                start16, span16 = self._sector_arc(index)
+                painter.drawPie(self._pie_rect(cx, cy, beam_reach), start16, span16)
+        finally:
+            painter.restore()
+
+        # 2) Faint surface so the wheel reads as a disc without hiding the screen.
+        disc = QColor(12, 20, 19)
+        disc.setAlpha(int(round(_LOL_DISC_ALPHA * ease)))
+        painter.setPen(Qt.NoPen)
+        painter.setBrush(disc)
+        painter.drawEllipse(QPointF(cx, cy), radius, radius)
+
+        # 3) Gold separators on the slice boundaries.
+        separator = QColor(*_LOL_GOLD)
+        separator.setAlpha(int(round(_LOL_LINE_ALPHA * ease)))
+        painter.setPen(QPen(separator, 1.0))
+        painter.setBrush(Qt.NoBrush)
+        for index in range(count):
+            angle = math.radians(sector_center_angle(index, count) + 180.0 / count)
+            painter.drawLine(
+                QPointF(cx + medallion * math.cos(angle), cy + medallion * math.sin(angle)),
+                QPointF(cx + radius * math.cos(angle), cy + radius * math.sin(angle)),
+            )
+
+        # 4) Outer rim and medallion rim.
+        rim = QColor(*_LOL_GOLD)
+        rim.setAlpha(int(round(_LOL_RING_ALPHA * ease)))
+        painter.setPen(QPen(rim, 1.4))
+        painter.drawEllipse(QPointF(cx, cy), radius, radius)
+        rim.setAlpha(min(255, int(round(_LOL_RING_ALPHA * 1.5 * ease))))
+        painter.setPen(QPen(rim, 2.0))
+        painter.drawEllipse(QPointF(cx, cy), medallion, medallion)
+
+        # 5) Icons on the 0.65 R circle.
+        if config.show_icons:
+            for index in range(count):
+                weight = weights[index]
+                size = float(config.icon_size) * (1.0 + _ICON_HOVER_GROWTH * weight) * ease
+                if size < 1.0:
+                    continue
+                angle = math.radians(sector_center_angle(index, count))
+                icon_radius = radius * _LOL_ICON_FACTOR
+                if weight > 0.5:
+                    colour = QColor(accent)
+                    colour.setAlpha(int(round(255 * ease)))
+                else:
+                    colour = QColor(*_LOL_ICON_COLOUR)
+                    colour.setAlpha(int(round(235 * ease)))
+                self._draw_slice_icon(
+                    painter,
+                    index,
+                    cx + icon_radius * math.cos(angle),
+                    cy + icon_radius * math.sin(angle),
+                    size,
+                    colour,
+                    ease,
+                )
+
+        # 6) Medallion body: radial gradient + inner gold ring.
+        body = QRadialGradient(QPointF(cx, cy - medallion * 0.25), medallion * 1.3)
+        body.setColorAt(0.0, QColor(34, 64, 60, int(round(245 * ease))))
+        body.setColorAt(0.55, QColor(18, 38, 35, int(round(245 * ease))))
+        body.setColorAt(1.0, QColor(9, 20, 19, int(round(250 * ease))))
+        painter.setPen(Qt.NoPen)
+        painter.setBrush(body)
+        painter.drawEllipse(QPointF(cx, cy), medallion * 0.92, medallion * 0.92)
+        inner_ring = QColor(*_LOL_GOLD)
+        inner_ring.setAlpha(min(255, int(round(_LOL_RING_ALPHA * 1.8 * ease))))
+        painter.setPen(QPen(inner_ring, 1.2))
+        painter.setBrush(Qt.NoBrush)
+        painter.drawEllipse(QPointF(cx, cy), medallion * 0.92, medallion * 0.92)
+
+        # 7) Top badge: a blue diamond, drawn (not an asset).
+        diamond_y = cy - medallion * 0.44
+        half_w = medallion * 0.11
+        half_h = medallion * 0.15
+        diamond = QPolygonF(
+            [
+                QPointF(cx, diamond_y - half_h),
+                QPointF(cx + half_w, diamond_y),
+                QPointF(cx, diamond_y + half_h),
+                QPointF(cx - half_w, diamond_y),
+            ]
+        )
+        painter.setPen(QPen(QColor(170, 235, 248, int(round(210 * ease))), 1.0))
+        painter.setBrush(QColor(92, 190, 222, int(round(240 * ease))))
+        painter.drawPolygon(diamond)
+        painter.setPen(Qt.NoPen)
+        painter.setBrush(QColor(186, 240, 250, int(round(110 * ease))))
+        painter.drawPolygon(
+            QPolygonF(
+                [
+                    QPointF(cx, diamond_y - half_h),
+                    QPointF(cx + half_w, diamond_y),
+                    QPointF(cx, diamond_y),
+                ]
+            )
+        )
+
+        # 8) Centre text: PING, then a BACK hint with a small mouse glyph.
+        painter.setPen(QColor(122, 205, 228, int(round(245 * ease))))
+        ping_font = QFont("Arial", max(6, int(round(medallion * 0.23))), QFont.Bold)
+        painter.setFont(ping_font)
+        metrics = painter.fontMetrics()
+        painter.drawText(
+            QPointF(
+                cx - metrics.horizontalAdvance("PING") / 2.0,
+                cy + medallion * 0.12,
+            ),
+            "PING",
+        )
+
+        back_font = QFont("Arial", max(5, int(round(medallion * 0.13))), QFont.Normal)
+        painter.setFont(back_font)
+        back_metrics = painter.fontMetrics()
+        back_y = cy + medallion * 0.58
+        back_width = back_metrics.horizontalAdvance("BACK")
+        glyph_w = medallion * 0.09
+        glyph_h = medallion * 0.14
+        glyph_left = cx - (glyph_w + back_width + medallion * 0.06) / 2.0
+        painter.setPen(QPen(QColor(170, 174, 168, int(round(200 * ease))), 1.0))
+        painter.setBrush(Qt.NoBrush)
+        painter.drawRoundedRect(
+            QRectF(glyph_left, back_y - glyph_h * 0.72, glyph_w, glyph_h),
+            glyph_w * 0.45,
+            glyph_w * 0.45,
+        )
+        painter.drawLine(
+            QPointF(glyph_left + glyph_w / 2.0, back_y - glyph_h * 0.72),
+            QPointF(glyph_left + glyph_w / 2.0, back_y - glyph_h * 0.32),
+        )
+        painter.setPen(QColor(170, 174, 168, int(round(200 * ease))))
+        painter.drawText(
+            QPointF(glyph_left + glyph_w + medallion * 0.06, back_y), "BACK"
         )
 
     # ------------------------------------------------------------------- paint
@@ -632,6 +889,17 @@ class OverlayWindow(QWidget):
 
     def _paint_wheel(self, painter: QPainter, now: float) -> None:
         config = self._config
+        if str(config.theme).lower() == "lol":
+            centre = self.mapFromGlobal(self._center)
+            self._paint_lol_wheel(
+                painter,
+                now,
+                float(centre.x()),
+                float(centre.y()),
+                max(20.0, float(config.wheel_radius)),
+                self._open_ease(now),
+            )
+            return
         count = self._count
         centre = self.mapFromGlobal(self._center)
         cx = float(centre.x())

@@ -18,13 +18,19 @@ vector `QPainterPath` geometry generated in `src/lolping/assets.py`, and the
 sound cues are synthesised in `src/lolping/sounds.py`, so the repository
 contains no Riot Games assets and no binary media files.
 
-- Version: **0.3.1**
+- Version: **0.3.2**
 - Platform: **Windows 11** (64-bit)
 - Runtime: **Python 3.14**, **PyQt5 5.15.11**, **pynput 1.8.2**
 - No other runtime dependencies, no network access at runtime
 
 ## Features
 
+- Two wheel skins: the original grey-and-gold look and a League-inspired
+  `lol` theme (gold separators, outward light beams, centre medallion with
+  PING / BACK). Slice icons may be replaced by local PNG files; the
+  repository ships none (see `assets/icons/ICONS.md`).
+- A click without dragging sends the centre (basic) ping; dragging and
+  releasing inside the dead zone still cancels.
 - Eight-sector radial menu, opened at the mouse cursor by a hold-and-drag
   gesture (default: hold **Alt + left mouse button**).
 - Default sectors, clockwise from 3 o'clock: On My Way, All-In, Assist Me, Need
@@ -97,7 +103,7 @@ A packaged executable can be built from source as described in
 | 3 | 7:30 | Need Vision | `vision` |
 | 4 | 9 o'clock | Enemy Missing | `missing` |
 | 5 | 10:30 | Enemy Vision | `enemy_vision` |
-| 6 | 12 o'clock | Retreat | `retreat` |
+| 6 | 12 o'clock | Danger | `danger` |
 | 7 | 1:30 | Push | `push` |
 
 The icon ids `danger` and `generic` are also available and can be assigned to
@@ -159,7 +165,7 @@ All user data lives in `%APPDATA%\lolping-desktop\`:
 - **Sound overlap.** The Windows `winsound` API plays one asynchronous sound at
   a time, so a newer cue interrupts the previous one. For short cues this is a
   deliberate trade-off, not a defect.
-- **Scope.** Windows only, fixed eight sectors in v0.3.1, no game awareness, no
+- **Scope.** Windows only, fixed eight sectors in v0.3.2, no game awareness, no
   team or room features, no cross-platform support.
 
 ## License

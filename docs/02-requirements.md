@@ -1,8 +1,8 @@
-# 2. Requirements — lolping v0.3.1
+# 2. Requirements — lolping v0.3.2
 
 ## 2.1 Purpose and conventions
 
-This document states what lolping v0.3.1 must do. It derives from the frozen
+This document states what lolping v0.3.2 must do. It derives from the frozen
 module contract in `docs/00-interfaces.md`, extended by the v0.3.0 and v0.3.1 feature briefs
 for slice artwork, animation and sound, and is the reference for the design
 (`docs/03-design.md`) and tests (`docs/04-test-plan.md`). "Must" marks a
@@ -98,7 +98,7 @@ mandatory requirement. Values that are not fixed yet are written as
 | `trigger_mouse_button` | `left` | left, right, middle, x1, x2 |
 | `wheel_radius` | 130 | 60–400 (logical px) |
 | `dead_zone` | 34 | 5 to `wheel_radius − 20` |
-| `sector_count` | 8 | fixed at 8 in v0.3.1 |
+| `sector_count` | 8 | fixed at 8 in v0.3.2 |
 | `sectors` | On My Way, All-In, Assist Me, Need Vision, Enemy Missing, Enemy Vision, Retreat, Push | eight names |
 | `animation_tau` | 0.035 | 0.005–0.5 |
 | `mark_duration_ms` | 900 | 300–4000 |
@@ -242,3 +242,14 @@ stops the input listener and exits cleanly.
 Every FR and NFR is covered by test cases in `docs/04-test-plan.md`, which ends
 with a requirement-to-test-case table. Unmeasured performance values remain
 "TBD - measure" until that protocol has been executed.
+
+## 8. v0.3.2 additions
+
+| ID | Requirement | Acceptance |
+| --- | --- | --- |
+| FR-29 | The wheel offers a League-inspired skin (`theme = "lol"`): gold separators, outward light beams and a centre medallion carrying PING / BACK, drawn entirely in code. | Selecting the theme renders the skin on every monitor without any image file. |
+| FR-30 | Slice icons may be overridden by local `<icon id>.png` files placed in `assets/icons/`; the files are never committed and a missing or corrupt file falls back to the vector icon. | No configuration or missing file can produce an empty slice. |
+| FR-31 | A click without dragging (pointer travel <= 8 px) commits the basic centre ping; releasing inside the dead zone after a real drag cancels. | A click logs one `Ping` record; drag-and-return logs nothing. |
+
+The defaults also move slice 6 from *Retreat* to *Danger* so that the eight
+positions match the reference wheel (12 o'clock is Danger).

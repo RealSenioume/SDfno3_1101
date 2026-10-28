@@ -315,6 +315,46 @@ def resolve_icon(icons: Iterable[str] | None, index: int) -> str:
     return "generic"
 
 
+# --------------------------------------------------------------------------
+# Image icons (local only, never committed)
+# --------------------------------------------------------------------------
+def icon_search_dirs() -> tuple[Path, ...]:
+    """Folders scanned for ``<icon id>.png``, in priority order."""
+    folders: list[Path] = [assets_dir()]
+    try:  # the user data folder is convenient for packaged builds
+        from .config import app_data_dir
+
+        folders.append(app_data_dir() / "icons")
+    except Exception:  # pragma: no cover - defensive
+        pass
+    return tuple(folders)
+
+
+def icon_file_for(icon_id: str) -> Path | None:
+    """Return the first existing image file for ``icon_id``, if any."""
+    for folder in icon_search_dirs():
+        candidate = folder / f"{icon_id}.png"
+        if candidate.is_file():
+            return candidate
+    return None
+
+
+def load_icon_image(icon_id: str, size: int, dpr: float = 1.0) -> QPixmap | None:
+    """Load a local PNG for ``icon_id``, or ``None`` to use the vector icon.
+
+    The image is looked up once per (id, size, ratio) and cached, including the
+    "not found" result, so a missing file never costs a disk access per frame.
+    """
+    key = ("image-icon", str(icon_id), int(size), round(float(dpr), 2))
+    if key in _FILE_CACHE:
+        return _FILE_CACHE[key]
+
+    path = icon_file_for(icon_id)
+    pixmap = load_pixmap(str(path), size, dpr) if path is not None else None
+    _FILE_CACHE[key] = pixmap
+    return pixmap
+
+
 def clear_caches() -> None:
     """Drop cached pixmaps (called when the theme colour changes)."""
     _PIXMAP_CACHE.clear()
