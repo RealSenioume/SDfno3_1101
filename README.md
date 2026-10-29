@@ -22,6 +22,17 @@ contains no Riot Games assets and no binary media files.
 - Platform: **Windows 11** (64-bit)
 - Runtime: **Python 3.14**, **PyQt5 5.15.11**, **pynput 1.8.2**
 - No other runtime dependencies, no network access at runtime
+## Download
+
+**Windows v0.3.4** - `lolping-0.3.4-win64.zip`, 36.3 MB, SHA-256
+`f62ac07d6db020a5a1b8e2176fe5f018ea53c0c04ae1c64eb1f584b14925ead0`.
+Unzip it into an empty folder and run `lolping\lolping.exe`; the `_internal`
+folder must stay next to it. The executable is unsigned, so Windows SmartScreen
+may ask for confirmation.
+
+- [Download lolping-0.3.4-win64.zip](release/lolping-0.3.4-win64.zip)
+
+
 
 ## Features
 

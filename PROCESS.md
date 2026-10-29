@@ -138,3 +138,13 @@ For more details during development, check out the docs.
 - Pushed without a version bump so it can be tried on other machines before being called fixed. 158 tests.
 
 - 10.29.2026
+
+# V0.3.4 Release Package
+
+- Packaged v0.3.4 for Windows with Python 3.12 and PyInstaller 6.22.3, because PyInstaller support for the 3.14 interpreter on this machine lags behind. The build script ran the test suite, the bilingual check and a frozen offscreen --self-test before it produced release/lolping-0.3.4-win64.zip (36.3 MB, sha256 f62ac07d...25ead0).
+
+- Committed the zip and its .sha256 file into release/ and linked it from the README, because this machine has neither the gh CLI nor a GitHub token, so a Release asset could not be created from here. That puts a 36 MB binary in the repository history - the price of a download link that works today.
+
+- 162 tests; the frozen exe reports 0.3.4 and passes --self-test on its own.
+
+- 10.29.2026

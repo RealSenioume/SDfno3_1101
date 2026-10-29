@@ -18,6 +18,16 @@
 - 平台：**Windows 11**（64 位）
 - 运行时：**Python 3.14**、**PyQt5 5.15.11**、**pynput 1.8.2**
 - 无其他运行时依赖，运行期间不访问网络
+## 下载
+
+**Windows v0.3.4** —— `lolping-0.3.4-win64.zip`，36.3 MB，SHA-256
+`f62ac07d6db020a5a1b8e2176fe5f018ea53c0c04ae1c64eb1f584b14925ead0`。
+解压到一个空文件夹后运行 `lolping\lolping.exe`，`_internal` 文件夹必须与它同级。
+exe 未签名，Windows SmartScreen 可能要求确认。
+
+- [下载 lolping-0.3.4-win64.zip](release/lolping-0.3.4-win64.zip)
+
+
 
 ## 功能
 
