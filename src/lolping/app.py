@@ -27,6 +27,7 @@ from pathlib import Path
 from typing import Any
 
 from PyQt5.QtCore import QEvent, QObject, QPoint, QTimer, Qt
+from PyQt5.QtGui import QGuiApplication
 from PyQt5.QtGui import QColor, QCursor, QIcon, QPainter, QPen, QPixmap
 from PyQt5.QtWidgets import (
     QAction,
@@ -212,6 +213,17 @@ class PingApp:
         self._overlay.warm_up()
         if self._config.open_settings_on_start:
             QTimer.singleShot(250, self._open_settings)
+        for screen in QGuiApplication.screens():
+            geometry = screen.geometry()
+            log.info(
+                "screen %s geometry=%s,%s %sx%s dpr=%.2f",
+                screen.name(),
+                geometry.x(),
+                geometry.y(),
+                geometry.width(),
+                geometry.height(),
+                screen.devicePixelRatio(),
+            )
         log.info("lolping %s ready (%s)", __version__, self._trigger_hint())
         return self._app.exec_()
 
@@ -273,9 +285,25 @@ class PingApp:
             return
         self._t_down = pressed_at
         self._frame_ms = None
-        self._wheel_centre = QPoint(int(x), int(y))
+        # pynput's hook reports physical pixels, while Qt (High-DPI scaling on)
+        # works in logical pixels. Mixing them puts the wheel at roughly
+        # (scale - 1) x position on a scaled display - zero at the top-left
+        # corner, growing towards the bottom-right. Ask Qt for the pointer so
+        # the centre, the painting and the hit-testing share one coordinate
+        # space; the hook value is kept for the log and the latency probe.
+        pointer = QCursor.pos()
+        self._wheel_centre = QPoint(pointer.x(), pointer.y())
         self._watcher.arm(self._on_first_frame)
-        log.debug("trigger at (%s, %s)", x, y)
+        if (int(x), int(y)) != (pointer.x(), pointer.y()):
+            log.debug(
+                "trigger hook=(%s, %s) qt=(%s, %s) - display scaling differs",
+                x,
+                y,
+                pointer.x(),
+                pointer.y(),
+            )
+        else:
+            log.debug("trigger at (%s, %s)", x, y)
         self._overlay.begin_at(self._wheel_centre)
         self._play("open")
 

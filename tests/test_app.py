@@ -23,6 +23,7 @@ from pathlib import Path
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
+from PyQt5.QtCore import QPoint  # noqa: E402
 from PyQt5.QtWidgets import QApplication, QSystemTrayIcon  # noqa: E402
 
 from lolping import app as app_module  # noqa: E402
@@ -199,6 +200,53 @@ class TestTriggerSwitchSync(unittest.TestCase):
         self.paused = True
         self.dialog._sync_trigger_switch()
         self.assertEqual(self.calls, [False])
+
+
+class _OverlayStub:
+    """Records where the wheel was asked to open; nothing is painted."""
+
+    def __init__(self) -> None:
+        self.begun: list[tuple[int, int]] = []
+        self._open = False
+
+    def is_open(self) -> bool:
+        return self._open
+
+    def begin_at(self, point) -> None:
+        self.begun.append((point.x(), point.y()))
+        self._open = True
+
+
+class _PointerStub:
+    def __init__(self, point) -> None:
+        self._point = point
+
+    def pos(self):
+        return self._point
+
+
+class TestTriggerUsesQtPointer(unittest.TestCase):
+    """The overlay centre must come from Qt, not from the physical hook pixels."""
+
+    def setUp(self) -> None:
+        global _APP
+        _APP = QApplication.instance() or QApplication([])
+        self._original_cursor = app_module.QCursor
+        app_module.QCursor = _PointerStub(QPoint(320, 240))  # type: ignore[assignment]
+        self.controller = app_module.PingApp(
+            _APP, Config(), None, _FakeInstance()  # type: ignore[arg-type]
+        )
+        self.overlay = _OverlayStub()
+        self.controller._overlay = self.overlay  # type: ignore[assignment]
+
+    def tearDown(self) -> None:
+        app_module.QCursor = self._original_cursor  # type: ignore[assignment]
+        self.controller._tray.hide()
+
+    def test_hook_pixels_are_replaced_by_the_qt_pointer(self) -> None:
+        # A scaled display hands the hook (999, 888) while Qt reports (320, 240).
+        self.controller._on_trigger_down(999, 888, 0.0)
+        self.assertEqual(self.overlay.begun, [(320, 240)])
 
 
 if __name__ == "__main__":

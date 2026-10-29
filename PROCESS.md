@@ -126,3 +126,15 @@ For more details during development, check out the docs.
 - 157 tests; the live sync, the fact that an automatic update does not bounce back into the app, and a click on the right-hand side of the pill are all pinned.
 
 - 10.29.2026
+
+# Hotfix - wheel offset on scaled displays
+
+- Someone ran lolping on another PC and the wheel appeared away from the cursor: exact at the top-left corner, then growing towards the bottom-right by roughly twice the cursor distance. That is the fingerprint of two coordinate spaces being mixed, not of a drawing bug.
+
+- pynput's hook reports physical pixels, while Qt with High-DPI scaling works in logical pixels, and the wheel centre was taken straight from the hook. At 100% scaling the two coincide, which is why it never showed on my machine. The centre now comes from QCursor.pos() - the same space as the painting, the hit test and the hover logic; hook pixels are kept only for the log and the latency probe.
+
+- Replaced guesswork with a diagnostic: the start-up log now lists each screen's geometry and dpr, and when the hook and Qt coordinates differ the trigger line prints both, so a scaled display can be read from the log instead of inferred.
+
+- Pushed without a version bump so it can be tried on other machines before being called fixed. 158 tests.
+
+- 10.29.2026
