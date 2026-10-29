@@ -34,7 +34,7 @@ contains no Riot Games assets and no binary media files.
 - Eight-sector radial menu, opened at the mouse cursor by a hold-and-drag
   gesture (default: hold **Alt + left mouse button**).
 - Default sectors, clockwise from 3 o'clock: On My Way, All-In, Assist Me, Need
-  Vision, Enemy Missing, Enemy Vision, Retreat, Push. All eight are
+  Vision, Enemy Missing, Enemy Vision, Danger, Push. All eight are
   renameable.
 - Every slice shows a vector icon: a default icon per sector, a choice of ten
   icon ids, and an optional custom PNG per slice. No Riot Games art is used.

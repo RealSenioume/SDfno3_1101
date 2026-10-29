@@ -151,5 +151,56 @@ class TestCommandLine(_ScratchCase):
             self.assertEqual(sync.main(["--root", str(self.root)]), 0)
 
 
+
+
+class TestDocsMatchTheCode(unittest.TestCase):
+    """The bilingual checker compares shape, not content; these catch drift."""
+
+    def _read(self, name: str) -> str:
+        return (ROOT / name).read_text(encoding="utf-8")
+
+    def _version(self) -> str:
+        text = (ROOT / "src" / "lolping" / "__init__.py").read_text(encoding="utf-8")
+        for line in text.splitlines():
+            if line.startswith("__version__"):
+                return line.split("=", 1)[1].strip().strip('"').strip("'")
+        self.fail("no __version__ in the package")
+
+    def test_readme_version_matches_the_package(self) -> None:
+        version = self._version()
+        self.assertIn(f"Version: **{version}**", self._read("README.md"))
+        self.assertIn(f"版本：**{version}**", self._read("README.zh-CN.md"))
+
+    def test_readme_lists_the_real_default_sectors(self) -> None:
+        for name in (
+            "On My Way",
+            "All-In",
+            "Assist Me",
+            "Need Vision",
+            "Enemy Missing",
+            "Enemy Vision",
+            "Danger",
+            "Push",
+        ):
+            self.assertIn(name, self._read("README.md"))
+            self.assertIn(name, self._read("README.zh-CN.md"))
+
+    def test_readme_no_longer_offers_retreat_as_a_default(self) -> None:
+        for name in ("README.md", "README.zh-CN.md"):
+            self.assertNotIn("Retreat", self._read(name))
+
+    def test_requirements_defaults_match_the_code(self) -> None:
+        text = self._read("docs/02-requirements.md")
+        for line in text.splitlines():
+            if line.startswith("| `sectors`"):
+                self.assertIn("Danger", line)
+                self.assertNotIn("Retreat", line)
+            elif line.startswith("| `sector_icons`"):
+                self.assertIn("`danger`", line)
+                self.assertNotIn("`retreat`", line)
+            elif line.startswith("| `theme`"):
+                self.assertIn("lol", line)
+
+
 if __name__ == "__main__":
     unittest.main()

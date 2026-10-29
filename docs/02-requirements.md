@@ -83,7 +83,7 @@ mandatory requirement. Values that are not fixed yet are written as
 
 | ID | Requirement | Acceptance criteria |
 | --- | --- | --- |
-| FR-23 | Every slice displays a vector icon selected by `sector_icons[i]`. The default order, clockwise from 3 o'clock, is `on_my_way`, `all_in`, `assist`, `vision`, `missing`, `enemy_vision`, `retreat`, `push`; ten ids are available, including `danger` and `generic`. Icons are drawn at 0.60 R, grow by 10 % while hovered and scale with the wheel-open animation; `show_icons=false` hides them. All icons are original `QPainterPath` geometry generated in code; no Riot Games or third-party artwork is shipped. | Each of the eight slices shows a distinct icon; disabling Show icons removes them and moves the rim labels back to 0.72 R; the repository contains no image files for the default icons. |
+| FR-23 | Every slice displays a vector icon selected by `sector_icons[i]`. The default order, clockwise from 3 o'clock, is `on_my_way`, `all_in`, `assist`, `vision`, `missing`, `enemy_vision`, `danger`, `push`; ten ids are available, including `danger` and `generic`. Icons are drawn at 0.60 R, grow by 10 % while hovered and scale with the wheel-open animation; `show_icons=false` hides them. All icons are original `QPainterPath` geometry generated in code; no Riot Games or third-party artwork is shipped. | Each of the eight slices shows a distinct icon; disabling Show icons removes them and moves the rim labels back to 0.72 R; the repository contains no image files for the default icons. |
 | FR-24 | For any slice, a non-empty `sector_images[i]` path selects a user PNG that replaces that slice's vector icon, scaled and clipped to a circle. Files may live anywhere. A missing, unreadable or non-image file must fall back to the configured vector icon without breaking the slice or the frame. | A valid PNG appears in the slice and in the burst icon pop; deleting the file or giving a wrong path restores the vector icon; no exception and no blank slice. |
 | FR-25 | When the wheel opens it scales from 70 % to 100 % of its radius with a cubic ease-out and fades in over 130 ms. Hover and commit use the cursor position independently of the animation, so a fast release cannot be lost to an unfinished open animation. | The first visible frame is smaller and more transparent and reaches full size within about 130 ms; a trigger and release inside 130 ms still commits the hovered sector. |
 | FR-26 | On commit the wheel closes and a layered burst plays at the wheel centre for `mark_duration_ms`: two staggered expanding rings (18 → 96 px), five short streaks flying outward along the committed sector's direction at −18°, −9°, 0°, +9° and +18°, an icon pop with an overshoot curve, and the sector name above the burst. A cancelled gesture plays no burst. | Every commit shows two rings and five streaks aligned with the committed slice; the burst disappears at `mark_duration_ms`; cancel shows no burst. |
@@ -99,7 +99,7 @@ mandatory requirement. Values that are not fixed yet are written as
 | `wheel_radius` | 130 | 60–400 (logical px) |
 | `dead_zone` | 34 | 5 to `wheel_radius − 20` |
 | `sector_count` | 8 | fixed at 8 in v0.3.4 |
-| `sectors` | On My Way, All-In, Assist Me, Need Vision, Enemy Missing, Enemy Vision, Retreat, Push | eight names |
+| `sectors` | On My Way, All-In, Assist Me, Need Vision, Enemy Missing, Enemy Vision, Danger, Push | eight names |
 | `animation_tau` | 0.035 | 0.005–0.5 |
 | `mark_duration_ms` | 900 | 300–4000 |
 | `sound_enabled` | false | true / false |
@@ -107,9 +107,9 @@ mandatory requirement. Values that are not fixed yet are written as
 | `open_settings_on_start` | `true` | show the settings window once at start-up |
 | `start_with_windows` | false | true / false |
 | `show_labels` | true | true / false |
-| `theme` | `gold` | gold, blue, red |
+| `theme` | `gold` | gold, blue, red, lol |
 | `show_icons` | true | true / false |
-| `sector_icons` | `on_my_way`, `all_in`, `assist`, `vision`, `missing`, `enemy_vision`, `retreat`, `push` | any of the ten icon ids, per slice |
+| `sector_icons` | `on_my_way`, `all_in`, `assist`, `vision`, `missing`, `enemy_vision`, `danger`, `push` | any of the ten icon ids, per slice |
 | `sector_images` | eight empty strings | PNG path or `""` (vector icon), per slice |
 | `icon_size` | 30 | 12–64 px |
 | `sound_volume` | 0.5 | 0.0–1.0 |

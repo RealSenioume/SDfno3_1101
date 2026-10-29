@@ -78,7 +78,7 @@ The wheel has eight sectors, clockwise from 3 o'clock:
 | 3 | 7:30 | Need Vision |
 | 4 | 9 o'clock | Enemy Missing |
 | 5 | 10:30 | Enemy Vision |
-| 6 | 12 o'clock | Retreat |
+| 6 | 12 o'clock | Danger |
 | 7 | 1:30 | Push |
 
 Only the direction matters: after leaving the dead zone, releasing at any

@@ -14,7 +14,7 @@
 `QPainterPath` 生成的原创矢量图形，音效由 `src/lolping/sounds.py` 实时合成，因此仓库中
 不含任何 Riot Games 素材，也没有二进制媒体文件。
 
-- 版本：**0.3.1**
+- 版本：**0.3.4**
 - 平台：**Windows 11**（64 位）
 - 运行时：**Python 3.14**、**PyQt5 5.15.11**、**pynput 1.8.2**
 - 无其他运行时依赖，运行期间不访问网络
@@ -25,7 +25,7 @@
 - 不拖动的单击会发送中央（基础）ping；拖动后在死区内松开仍然取消。
 - 八扇区径向菜单，通过"按住并拖动"的手势在鼠标位置展开（默认：按住 **Alt + 鼠标左键**）。
 - 默认扇区（从 3 点钟方向顺时针）：On My Way、All-In、Assist Me、Need Vision、
-  Enemy Missing、Enemy Vision、Retreat、Push。八个扇区都可重命名。
+  Enemy Missing、Enemy Vision、Danger、Push。八个扇区都可重命名。
 - 每个扇区显示一个矢量图标：每个扇区有默认图标，可在十个图标中选择，也可用自定义 PNG
   替换单个扇区。不使用 Riot Games 美术素材。
 - 简短的展开动画（130 ms 内缩放并淡入）。提交时播放分层爆裂动画：两个扩散圆环、五条
@@ -81,7 +81,7 @@ python -m lolping
 | 3 | 7:30 | Need Vision | `vision` |
 | 4 | 9 点钟 | Enemy Missing | `missing` |
 | 5 | 10:30 | Enemy Vision | `enemy_vision` |
-| 6 | 12 点钟 | Retreat | `retreat` |
+| 6 | 12 点钟 | Danger | `danger` |
 | 7 | 1:30 | Push | `push` |
 
 图标 id `danger` 和 `generic` 同样可用，可在设置中指派给任意扇区。自定义 PNG 可以替换
@@ -138,7 +138,7 @@ python -m lolping [--config PATH] [--latency-probe] [--debug] [--self-test]
   更改。
 - **声音不叠加。** Windows 的 `winsound` API 一次只能异步播放一个声音，因此新的音效会
   打断上一个。对于短音效而言这是刻意的取舍，不是缺陷。
-- **范围。** 仅支持 Windows；v0.3.1 固定为八个扇区；不具备游戏感知能力；没有队伍或房间
+- **范围。** 仅支持 Windows；v0.3.4 固定为八个扇区；不具备游戏感知能力；没有队伍或房间
   功能；不支持跨平台。
 
 ## 许可证
