@@ -9,3 +9,112 @@
 - + ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 -     + CategoryInfo          : ObjectNotFound: (.\.venv\Scripts\Activate.ps1:String) [], CommandNotFoundException
 -     + FullyQualifiedErrorId : CommandNotFoundException
+
+这个错误和之前不同：虚拟环境已经成功创建了，文件确实存在。现在的问题是 PowerShell 的执行策略（Execution Policy） 默认禁止运行 .ps1 脚本，这是 Windows 的安全机制，不是 Python 或 venv 的问题。
+
+错误信息关键词：
+
+text
+cannot be loaded because running scripts is disabled on this system
+✅ 解决方案
+方案 1：只对当前终端窗口临时放行（最安全、推荐）
+在 PowerShell 中运行：
+
+powershell
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+然后立刻再激活虚拟环境：
+
+powershell
+.\.venv\Scripts\Activate.ps1
+-Scope Process 表示只对当前这个 PowerShell 窗口生效。
+
+关闭窗口后自动失效，不会修改系统全局设置，最安全。
+
+成功后你会看到提示符前面出现 (.venv)，例如：
+
+text
+(.venv) PS C:\Users\User\SDfno3_1101>
+方案 2：对当前用户永久放行（一劳永逸）
+如果你不想每次打开 PowerShell 都设置一遍，可以设置为当前用户永久有效：
+
+powershell
+Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned
+RemoteSigned 的含义：
+
+本地自己写的脚本（包括 venv 激活脚本）：允许运行。
+
+从网络下载的脚本：必须经过数字签名才能运行。
+
+这是微软官方推荐的开发者常用设置，比 Unrestricted 安全。
+
+设置后可以用下面的命令确认：
+
+powershell
+Get-ExecutionPolicy -List
+你会看到 CurrentUser 一栏变成 RemoteSigned。
+
+方案 3：绕过 .ps1，改用其他激活脚本
+如果你不想改执行策略，可以用 venv 自带的 .bat 版本激活（适用于 CMD），或者在不修改策略的情况下临时调用。
+
+在 CMD 中激活
+打开 命令提示符（cmd），进入同一目录，运行：
+
+cmd
+.venv\Scripts\activate.bat
+CMD 没有 PowerShell 的执行策略限制。
+
+在 PowerShell 中通过 cmd 激活
+powershell
+cmd /c ".venv\Scripts\activate.bat"
+不过这种方式激活的环境只在 cmd 子进程里有效，退出子进程就失效，不推荐日常使用。
+
+在 Git Bash 中
+bash
+source .venv/Scripts/activate
+🔍 关于执行策略的说明
+查看当前所有作用域的策略：
+
+powershell
+Get-ExecutionPolicy -List
+常见结果示例：
+
+text
+Scope          ExecutionPolicy
+-----          ---------------
+MachinePolicy  Undefined
+UserPolicy     Undefined
+Process        Undefined
+CurrentUser    Undefined
+LocalMachine   Restricted     ← 全局默认被限制
+如果 LocalMachine 是 Restricted，而且 CurrentUser 也是 Undefined，那么默认继承 Restricted，脚本就会被禁止。
+
+⚠️ 不建议用 Set-ExecutionPolicy Unrestricted 或直接改 LocalMachine，那会影响整台机器上所有用户，安全性下降。
+
+✅ 验证成功
+执行方案 1 或方案 2 后，重新运行：
+
+powershell
+.\.venv\Scripts\Activate.ps1
+成功的话：
+
+提示符前出现 (.venv)；
+
+运行 python --version 会显示虚拟环境里的 Python 版本；
+
+运行 pip list 只会列出该虚拟环境里安装的包（初始通常只有 pip）。
+
+退出虚拟环境用：
+
+powershell
+deactivate
+🧭 总结
+方案	命令	适用场景
+临时放行（推荐）	Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass	只想在当前窗口激活一次
+永久放行当前用户（推荐）	Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned	经常使用 venv，一劳永逸
+用 CMD 激活	.venv\Scripts\activate.bat	不想改 PowerShell 策略
+Git Bash 激活	source .venv/Scripts/activate	使用 Git Bash 终端
+最省事的做法：先跑一次
+
+powershell
+Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned
+以后所有 PowerShell 窗口都能直接激活虚拟环境了。
