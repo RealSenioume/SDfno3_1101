@@ -1,6 +1,6 @@
 # lolping — Design Document
 
-Version 0.3.2 · Windows 11 · Python 3.14 · PyQt5 5.15.11 · pynput 1.8.2
+Version 0.3.3 · Windows 11 · Python 3.14 · PyQt5 5.15.11 · pynput 1.8.2
 
 This document explains *how* the system is built and *why* it is built that way.
 Requirements live in [`02-requirements.md`](02-requirements.md), the test
@@ -152,7 +152,7 @@ latency probe measures instead of hiding.
 ### 4.2 Thread-safe input state
 
 The hook keeps six fields behind one `threading.Lock`: pressed keys, held
-modifiers, required modifiers, trigger button, quit hotkey, and `wheel_open`.
+modifiers, required modifiers, trigger button, pause hotkey, and `wheel_open`.
 Callbacks take the lock, compute one decision, release it, and only then emit —
 so no signal is emitted while a lock is held, and no slot can deadlock the hook.
 
@@ -179,7 +179,7 @@ stateDiagram-v2
 | WheelOpen | trigger up | hovered sector = −1 | Idle | `cancel()`, no mark, no log |
 | WheelOpen | Esc | — | Idle | `cancel()` |
 | WheelOpen | other mouse button | — | Idle | `cancel()` |
-| any | quit hotkey | — | [*] | graceful shutdown |
+| any | pause hotkey | — | any | toggles paused; the wheel is ignored while paused |
 | any | listener died | — | any | restart, tray warning |
 
 Deliberate edge-case decisions:
@@ -489,12 +489,13 @@ expected results (`docs/04-test-plan.md`, TC-28 … TC-30).
 | `trigger_mouse_button` | str | `"left"` | left/right/middle/x1/x2 |
 | `wheel_radius` | int | 130 | 60–400 |
 | `dead_zone` | int | 34 | 5–(`wheel_radius`−20) |
-| `sector_count` | int | 8 | fixed in 0.3.2 |
+| `sector_count` | int | 8 | fixed in 0.3.3 |
 | `sectors` | list[str] | LoL-style names | length == `sector_count` |
 | `animation_tau` | float | 0.035 | 0.005–0.5 s |
 | `mark_duration_ms` | int | 900 | 300–4000 |
 | `sound_enabled` | bool | false | |
-| `quit_hotkey` | str | `"ctrl+shift+q"` | one modifier + one key |
+| `toggle_hotkey` | str | `"ctrl+shift+q"` | one modifier + one key (pause / resume) |
+| `open_settings_on_start` | bool | true | show the settings window once at start-up |
 | `start_with_windows` | bool | false | HKCU Run entry |
 | `show_labels` | bool | true | |
 | `theme` | str | `"gold"` | gold/blue/red |
@@ -646,7 +647,7 @@ Design-inherent, documented rather than hidden:
    desktop can still start a selection or an icon drag.
 4. Mixed-DPI multi-monitor: correct on the active screen only.
 5. Windows only — `msvcrt`, `winreg`, `winsound` are used directly.
-6. Pause is manual; fullscreen-app auto-pause is not implemented in 0.3.2.
+6. Pause is manual; fullscreen-app auto-pause is not implemented in 0.3.3.
 7. Sound cues cannot overlap: `winsound` stops the previous asynchronous sound
    when a new one starts. Documented as a trade-off; with 28–200 ms cues the
    audible effect is negligible.

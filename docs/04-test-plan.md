@@ -1,8 +1,8 @@
-# 4. Test plan — lolping v0.3.2
+# 4. Test plan — lolping v0.3.3
 
 ## 4.1 Purpose and scope
 
-This plan describes how lolping v0.3.2 is verified against
+This plan describes how lolping v0.3.3 is verified against
 `docs/02-requirements.md`: unit tests of the pure logic, system tests of the
 complete application on a documented Windows matrix, and measurement protocols
 for the non-functional requirements. Build verification is covered by
@@ -280,3 +280,13 @@ section 6 of the report.
 | TC-39 | Theme = `lol` | Gold separators, beams, medallion with PING / BACK; no image file needed |
 | TC-40 | Drop `danger.png` into `assets/icons/`, restart | The 12 o'clock slice shows the image; deleting the file restores the vector icon |
 | TC-41 | Switch back to a legacy theme | The original grey/gold look returns, unaffected by the skin |
+
+## 10. Addendum: pause hotkey and start-up dialog
+
+| # | Case | Expected |
+| --- | --- | --- |
+| TC-42 | Press Ctrl+Shift+Q while lolping runs | Tray message "Pings paused."; Alt + click no longer opens the wheel; pressing it again restores pinging |
+| TC-43 | Pause from the tray menu | The entry toggles to Resume and the tooltip reports the paused state |
+| TC-44 | Start lolping with "Open settings when lolping starts" on | The settings window opens once, after the tray icon appears |
+| TC-45 | Turn that option off and restart | The app starts silently with only the tray icon |
+| TC-46 | Reuse an old config.json containing `quit_hotkey` | The shortcut is kept and now behaves as the pause hotkey |

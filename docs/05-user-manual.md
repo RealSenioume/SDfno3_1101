@@ -1,4 +1,4 @@
-# 5. User manual — lolping v0.3.2
+# 5. User manual — lolping v0.3.3
 
 ## 5.1 What lolping is
 
@@ -97,8 +97,8 @@ All eight names can be changed in Settings.
 | Pause / Resume | Stops or restores the trigger gesture. The menu shows the next action. |
 | Quit | Closes lolping, including its overlay and input listener. |
 
-The configured quit hotkey (default **Ctrl+Shift+Q**) also closes the
-application from any window.
+The configured pause hotkey (default **Ctrl+Shift+Q**) pauses or resumes pinging;
+it works from any window. Quitting is done from the tray menu.
 
 ## 5.6 Settings
 
@@ -121,7 +121,8 @@ Cancel discards them. **Reset to defaults** restores every value below.
 | Enable sounds | Checkbox | Off | Master switch for all sound cues. |
 | Volume | Slider | 50 % | Loudness of every cue; 0 % is silent. |
 | Hover ticks | Checkbox | On | Plays the short tick when the highlighted slice changes. |
-| Quit hotkey | Text field | Ctrl+Shift+Q | Global shortcut that closes lolping. Enter it with plus signs, for example `Ctrl+Shift+Q`. |
+| Pause hotkey | Text field | Ctrl+Shift+Q | Global shortcut that pauses or resumes pinging. Enter it with plus signs, for example `Ctrl+Shift+Q`. |
+| Open settings when lolping starts | Checkbox | On | Shows the settings window once at start-up; turn it off to start silently. |
 | Start with Windows | Checkbox | Off | Registers lolping to start when you sign in to Windows. |
 | Theme | Drop-down | Gold | Palette of the wheel: gold, blue or red. |
 | Show labels | Checkbox | On | Draws the sector names around the rim. The centre label of the hovered sector stays visible. |
@@ -219,7 +220,7 @@ screen position of each commit.
 | Nothing appears over an administrator window. | Windows User Interface Privilege Isolation blocks normal-privilege overlays over elevated windows and their input. Run lolping with the same or higher privileges as the target, or use a non-elevated window. |
 | The trigger works in some applications but not others. | The other window is probably elevated (see above). Close it or run lolping elevated, then try again in a normal window to confirm lolping itself works. |
 | Alt + left click conflicts with an application shortcut. | Open Settings and choose another trigger (for example Ctrl + right button or a side mouse button). |
-| The quit hotkey or another Windows shortcut conflicts. | Choose a different quit hotkey in Settings. Some Windows-key combinations are reserved by the operating system and cannot be overridden. |
+| The pause hotkey or another Windows shortcut conflicts. | Choose a different pause hotkey in Settings. Some Windows-key combinations are reserved by the operating system and cannot be overridden. |
 | The wheel opens but no ping is logged. | Only commits are logged. Make sure you release outside the dead zone and that `%APPDATA%` is writable. Check `pings.jsonl` in the config folder. |
 | Starting lolping a second time does nothing. | Only one instance runs. The existing copy is already in the tray; use its menu. |
 | The tray icon is missing. | It may be in the hidden-icons overflow. If the process is not in Task Manager, start lolping again. |
@@ -254,7 +255,7 @@ listed in section 5.10, and it stays on your machine.
 
 - Exclusive-fullscreen applications and elevated windows can prevent the
   overlay from appearing (see Troubleshooting).
-- lolping has eight fixed sectors in v0.3.2.
+- lolping has eight fixed sectors in v0.3.3.
 - Sound cues cannot overlap: a new cue stops the previous one (see section 5.8).
 - The mouse button is seen by the window underneath before the wheel can appear,
   because a program cannot withhold input without a native hook. lolping installs

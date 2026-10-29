@@ -124,5 +124,28 @@ class TestCueRouting(unittest.TestCase):
         self.assertEqual(self.played, [("hover", 0.5, 3)])
 
 
+class TestPauseToggle(unittest.TestCase):
+    """The global hotkey flips the paused state, like the tray entry does."""
+
+    def setUp(self) -> None:
+        global _APP
+        _APP = QApplication.instance() or QApplication([])
+        self.controller = app_module.PingApp(
+            _APP, Config(), None, _FakeInstance()  # type: ignore[arg-type]
+        )
+
+    def tearDown(self) -> None:
+        self.controller._tray.hide()
+
+    def test_hotkey_toggles_pause_and_the_menu_text(self) -> None:
+        self.assertFalse(self.controller._paused)
+        self.controller._toggle_pause()
+        self.assertTrue(self.controller._paused)
+        self.assertEqual(self.controller._action_pause.text(), "Resume")
+        self.controller._toggle_pause()
+        self.assertFalse(self.controller._paused)
+        self.assertEqual(self.controller._action_pause.text(), "Pause")
+
+
 if __name__ == "__main__":
     unittest.main()

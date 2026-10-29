@@ -87,6 +87,18 @@ class TestDefaults(unittest.TestCase):
         self.assertEqual(Config().sectors[6], "Danger")
         self.assertEqual(Config().sector_icons[6], "danger")
 
+    def test_old_quit_hotkey_key_migrates_to_toggle(self) -> None:
+        # 0.3.2 and earlier called this setting quit_hotkey; an existing config
+        # must keep its shortcut after the rename.
+        config = Config.from_dict({"quit_hotkey": "alt+f4"})
+        self.assertEqual(config.toggle_hotkey, "alt+f4")
+
+    def test_open_settings_on_start_defaults_on(self) -> None:
+        self.assertTrue(Config().open_settings_on_start)
+        self.assertFalse(
+            Config.from_dict({"open_settings_on_start": False}).open_settings_on_start
+        )
+
     def test_click_places_ping_defaults_on_and_round_trips(self) -> None:
         self.assertTrue(Config().click_places_ping)
         config = Config(click_places_ping=False)
@@ -170,14 +182,14 @@ class TestFromDict(unittest.TestCase):
         self.assertEqual(config.sectors[0], "Valid")
         self.assertTrue(all(name.strip() for name in config.sectors))
 
-    def test_theme_and_quit_hotkey_fallbacks(self) -> None:
-        config = Config.from_dict({"theme": "neon", "quit_hotkey": "nothing"})
+    def test_theme_and_pause_hotkey_fallbacks(self) -> None:
+        config = Config.from_dict({"theme": "neon", "toggle_hotkey": "nothing"})
         self.assertEqual(config.theme, "gold")
-        self.assertEqual(config.quit_hotkey, "ctrl+shift+q")
+        self.assertEqual(config.toggle_hotkey, "ctrl+shift+q")
 
-    def test_quit_hotkey_is_normalised(self) -> None:
-        config = Config.from_dict({"quit_hotkey": " Ctrl + Shift + Q "})
-        self.assertEqual(config.quit_hotkey, "ctrl+shift+q")
+    def test_pause_hotkey_is_normalised(self) -> None:
+        config = Config.from_dict({"toggle_hotkey": " Ctrl + Shift + Q "})
+        self.assertEqual(config.toggle_hotkey, "ctrl+shift+q")
 
     def test_flags_require_real_booleans(self) -> None:
         config = Config.from_dict({"sound_enabled": "yes", "show_labels": 0})

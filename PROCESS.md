@@ -85,3 +85,33 @@ For more details during development, check out the docs.
 - Kept both old runs as control data: latency-v0.3.0.jsonl (before the warm-up) and latency-v0.2.0.jsonl (before the icons and audio). They are what makes the "103.57 -> 15.05 ms" claim checkable instead of just asserted.
 
 - 10.27.2026
+
+# V0.3.2 Update
+- Reworked the wheel's appearance against the in-game reference I use every day: a barely-there disc, eight gold separators, light beams that spill past the rim, and a centre medallion with PING and a BACK hint. It ships as an optional `lol` theme; the original three themes are untouched.
+
+- The icons were the part I could not simply copy. The reference art belongs to Riot, and this project has promised since the first commit to ship no third-party artwork. So the mechanism ships and the artwork does not: slice icons load from `assets/icons/<id>.png` on my own disk, that folder is git-ignored, and a missing file falls back to the vector icon. A fresh clone still works; it just looks like ours rather than theirs.
+
+- Moved the default sectors to match the reference layout: 12 o'clock is Danger now, not Retreat. Same eight positions, so the muscle memory from the game transfers instead of fighting me.
+
+- Added the interaction the wheel was actually missing: a click without dragging sends the basic centre ping. The threshold is measured on the greatest distance the pointer travelled, not on where it was released, otherwise a drag that comes back to the middle would be mistaken for a click.
+
+- Measured the new skin rather than assuming it was free: p95 7.41 ms against 6.08 ms before, so the eight additive gradients cost about one millisecond at the tail. That is 6.7x inside the 50 ms target, which means the static-layer cache I had planned was not worth writing.
+
+- 150 tests at this point; the renderer, the icon fallback chain, the click threshold and the sector defaults all have a test.
+
+- 10.29.2026
+
+# V0.3.3 Update
+- Changed Ctrl+Shift+Q from quitting to pausing. Quitting is a once-per-session action; silencing the pings is the one I actually press while working. The tray menu still quits.
+
+- Pausing also releases the mouse guard, so while paused the desktop behaves normally again instead of having Alt + click swallowed by a tool I am not using.
+
+- The hotkey now announces itself: a tray message says "Pings paused." or "Pings enabled.", and the menu entry flips between Pause and Resume. A silent global shortcut is a shortcut I cannot debug.
+
+- Old configs keep working: the setting used to be called `quit_hotkey`, so the loader accepts that name and writes the new one on the next save.
+
+- The settings window opens once at start-up, because launching and then immediately changing the trigger is what I do every day. There is a checkbox for people who disagree, which is also my way of admitting I might.
+
+- 153 tests now; the toggle and the old-key migration are pinned so a later rename cannot quietly break someone's config.
+
+- 10.29.2026

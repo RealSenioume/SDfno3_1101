@@ -3,7 +3,7 @@
 **Course:** SD5913 — Semester 1
 **Author:** Zhexian Tao
 **Student repository:** <https://github.com/RealSenioume/SDfno3_1101>
-**Version described:** 0.3.2
+**Version described:** 0.3.3
 
 ---
 
@@ -15,12 +15,12 @@ game. That gesture is fluent, and it is locked inside one application. This
 project re-implements the gesture as a standalone Windows desktop overlay so it
 can be used while presenting, streaming, tutoring or reviewing a match.
 
-The delivered artefact, `lolping` 0.3.2, is a tray-resident Python/PyQt5
+The delivered artefact, `lolping` 0.3.3, is a tray-resident Python/PyQt5
 application. It installs global keyboard and mouse hooks, draws a translucent
 always-on-top wheel centred on the pointer without stealing focus, animates the
 selection with frame-rate-independent exponential smoothing, leaves a fading
 mark where the ping was placed, and records every ping as JSON Lines. It is
-built from 15 modules totalling roughly 3,600 lines of Python, with 150
+built from 15 modules totalling roughly 3,600 lines of Python, with 153
 automated unit tests covering the geometry, configuration-repair,
 input-state-machine, icon and audio logic, plus a packaging pipeline that
 produces a standalone executable.
@@ -93,7 +93,7 @@ The objectives were:
 * A measurement methodology for trigger-to-first-paint latency that includes the
   cross-thread queue hop, together with an explicit statement of what it does
   *not* include.
-* An automated suite of 150 tests over the parts of the system most likely to be
+* An automated suite of 153 tests over the parts of the system most likely to be
   wrong (angle conventions, hostile configuration, input state transitions, icon
   fallbacks, audio buffers).
 
@@ -128,7 +128,7 @@ optional local-network rooms. It is a mature, cross-platform product.
 
 The present project differs deliberately:
 
-| Aspect | lolPing | lolping 0.3.2 |
+| Aspect | lolPing | lolping 0.3.3 |
 | --- | --- | --- |
 | Stack | Electron + TypeScript + C++ helper | Python 3.14 + PyQt5 + pynput |
 | Input suppression | Helper swallows Alt+drag | Cannot suppress; documented limitation |
@@ -208,7 +208,7 @@ code. Ten user stories were elicited; the three that drove most decisions:
 | FR-11 | Every ping is appended to a JSON Lines log |
 | FR-12 | Optional synthesised ping sound |
 | FR-13 | Tray menu: settings, ping log, config folder, pause, quit |
-| FR-14 | Configurable global quit hotkey |
+| FR-14 | Configurable global pause hotkey (reserves Ctrl+Shift+Q) |
 | FR-15 | Single instance per desktop session |
 | FR-16 | Optional start with Windows |
 | FR-17 | Never steal keyboard focus from the active application |
@@ -414,7 +414,7 @@ Three failure modes received explicit design attention:
 details decide whether the feature works at all:
 
 **Virtual key codes, not characters.** With Ctrl held, `pynput` reports the
-*control character* (`"\x11"` for Q), so matching a quit hotkey against
+*control character* (`"\x11"` for Q), so matching a pause hotkey against
 `key.char` fails exactly in the case that matters. The implementation derives
 letters and digits from `key.vk` instead, and only falls back to `char` for keys
 with no virtual code.
@@ -589,8 +589,18 @@ centre (basic) ping instead of cancelling, which is how the reference wheel
 behaves. The skin is drawn entirely in code, so the repository still ships no
 Riot artwork; slice icons can be overridden by local PNG files that are
 git-ignored, and the loader falls back to the vector icon when a file is absent.
+**What 0.3.3 changed, and why.** Two behaviours turned out to be wrong in the
+hands of the person using it. Ctrl+Shift+Q was bound to *quit*, which is the
+action needed once per session; what is needed many times an hour is to silence
+pings, so the hotkey now toggles pause (and pausing also releases the mouse
+guard, so the desktop behaves normally again). Second, the settings window now
+opens once at start-up, because the first thing anyone does after launching is
+adjust it; a checkbox turns that off. Both are input/UI changes: no paint code
+was touched, which is why the Section 6.3 measurements still describe the
+delivered build.
+
 Because the paint path changed, the latency figures in Section 6.3 were
-re-measured on 0.3.2 with this skin active: the skin costs about one millisecond
+re-measured on the 0.3.2 build with this skin active (0.3.3 changes input handling only): the skin costs about one millisecond
 at p90 and none of the 50 ms budget.
 
 ---
@@ -604,15 +614,15 @@ at p90 and none of the 50 ms budget.
 | `test_geometry.py` | ~27 | Dead zone, eight cardinal directions, exact boundary behaviour, angle sweep, span contiguity, easing convergence |
 | `test_config.py` | ~24 | Round-trip, hostile inputs, clamping, sector padding, atomic save, corrupt/missing file |
 | `test_hotkeys.py` | ~12 | Modifier aliases, canonical formatting, rejection of ambiguous combos |
-| `test_input_hook.py` | ~22 | Trigger, commit, cancels, quit hotkey, modifier edge cases, key tokens |
+| `test_input_hook.py` | ~22 | Trigger, commit, cancels, pause hotkey, modifier edge cases, key tokens |
 | `test_assets.py` | ~14 | Icon registry and defaults, fallback chain, every icon paints pixels, pixmap cache, missing user image |
 | `test_sounds.py` | ~11 | WAV headers and lengths, volume scaling, silence at zero, per-slice pitch, cache, playback safety |
-| `test_app.py` | ~7 | Tray activation opens one dialog only, re-entrant open ignored, cue gating by config |
+| `test_app.py` | ~8 | Tray activation opens one dialog only, re-entrant open ignored, cue gating by config |
 | `test_mouse_guard.py` | ~16 | Suppression rules for every mouse event, paused/disarmed guards, hook lifecycle |
-| `test_overlay.py` | ~10 | Mouse capture taken on open and released on every close path, warm-up leaves no state |
+| `test_overlay.py` | ~14 | Mouse capture taken on open and released on every close path, warm-up leaves no state |
 | `test_docs_sync.py` | ~8 | English/Chinese parity fingerprinting and exit codes |
 
-Result: **150 tests, all passing** (`python -m unittest discover -s tests`), in
+Result: **153 tests, all passing** (`python -m unittest discover -s tests`), in
 about 60 ms, with no display and no hooks installed (the icon suite forces the
 offscreen Qt platform).
 
@@ -709,10 +719,11 @@ the most painting work, at eight additive radial-gradient beams per frame.
 5. `commit_ms` is the time the button was held, not a latency. The 617 ms median is
    the harness's own pause between press and release; it is reported because the
    probe records it, not because it says anything about responsiveness.
-6. These figures are measured on the version that is actually delivered (0.3.2),
-   which closes the gap flagged in Section 5.6. The archived runs remain useful as
-   a controlled comparison: v0.3.0 (before the warm-up), v0.3.1 (before the skin),
-   v0.3.2 (this run).
+6. These figures were measured on the 0.3.2 build, which is the build that ships
+   this paint path; version 0.3.3 changes input handling and the start-up dialog
+   only, so the measured path is still the delivered one. The archived runs remain
+   useful as a controlled comparison: v0.3.0 (before the warm-up), v0.3.1 (before
+   the skin), v0.3.2 (this run).
 
 **Data-collection caveat.** The harness anchors the gesture on an empty strip of
 the taskbar so that the swallowed click cannot activate another application.
@@ -787,7 +798,7 @@ goal into a number and an argument.
 4. **Mixed-DPI multi-monitor.** Correct on the screen where the wheel opens;
    marks stay on that screen.
 5. **Windows only.** `msvcrt`, `winreg` and `winsound` are used directly.
-6. **No fullscreen auto-pause.** Pausing is manual in 0.3.2.
+6. **No fullscreen auto-pause.** Pausing is manual in 0.3.3.
 7. **Single-author evaluation.** The latency and usability data describe one
    machine and one user.
 
@@ -816,7 +827,7 @@ mixed-DPI desktop that breaks the obvious window architecture, and a global hook
 that fails silently by design.
 
 The result is a 3,600-line Python application with a documented architecture,
-ten summarised design decisions with rejected alternatives (nineteen in the full design document), 150 automated tests, a
+ten summarised design decisions with rejected alternatives (nineteen in the full design document), 153 automated tests, a
 formal manual test matrix, a packaging pipeline and a measured latency
 methodology. It honours every objective set out in Section 1.3: the gesture is
 reproduced, the tool is self-sufficient on a clean machine, the game client is
@@ -861,7 +872,7 @@ states what it cannot do is more trustworthy than one that does not.
 src/lolping/     13 modules: geometry, config, hotkeys, input_hook, overlay,
                  settings_dialog, app, single_instance, autostart, sounds,
                  logging_setup, __init__, __main__
-tests/           10 unittest suites, 150 tests
+tests/           10 unittest suites, 153 tests
 tools/           smoke_test.py, latency_report.py, demo_gesture.py
 build/           lolping.spec (PyInstaller), build.ps1
 docs/            00 module contract, 01 proposal, 02 requirements,
@@ -889,12 +900,41 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\build\build.ps1 -Clean
 
 ### Appendix C — Declaration of AI assistance
 
-> Delete or adapt this appendix according to the course policy. The project was
-> developed with AI assistance for drafting, code generation and review. State
-> honestly which parts: for example, that the architecture, module interfaces,
-> tests and documentation drafts were produced with an AI assistant, and that
-> every artefact was reviewed, executed and verified by the author before
-> submission. Keep this consistent with the course's academic-integrity rules.
+**Tools.** Two AI systems were used. DeepSeek's web chat was used early for
+design discussion and for drafts of the input-hook and rendering code. DeepSeek
+Harness (DSH), an agentic coding environment, was used from the v0.3.0 rewrite
+onward: it read the repository, edited files, ran the test suite, collected the
+latency measurements and drafted documentation and report sections. In both
+cases the assistant proposed and the author decided; no part of the submitted
+work was accepted without review.
+
+| Work | Author | AI assistant |
+| --- | --- | --- |
+| Requirements, scope, rubric alignment, final design choices | ✓ | — |
+| Module skeleton, interfaces, implementation | directed, reviewed, corrected | drafted most of the code |
+| Test suite | specified cases, judged coverage | wrote most tests |
+| Manual testing on Windows 11 (real gestures, DPI scales, two monitors, exclusive fullscreen) | ✓ | — |
+| Latency measurement runs | executed on the author's machine | wrote the probe and the analysis tool |
+| Screenshots and figures | ✓ | — |
+| Report, bilingual README and PROCESS drafting | content decisions, final wording | first drafts and translation passes |
+| Three attempts at mouse suppression | experiments and failure diagnosis | proposed and implemented each attempt |
+| Version control, releases, pushing to GitHub | ✓ | — |
+
+**What the assistant did not do.** No measurement in this report was generated
+or estimated by an AI: every number comes from runs recorded in `latency.jsonl`
+on the author's machine, and those logs are kept. No third-party code was
+copied; the reference implementation (Section 2.2) was studied for behaviour
+only, and none of its artwork or audio is included — the policy is stated as
+decision D18. All AI-drafted code was executed by the test suite (153 tests) and
+by hand before acceptance, and several AI proposals were rejected or rewritten;
+the first two mouse-suppression attempts recorded in `PROCESS.md` are examples.
+
+**Responsibility.** The author selected the approach, verified every artefact
+and is responsible for the submitted work, including the parts the assistant got
+wrong. `PROCESS.md` is kept as the running record of what was tried, what failed
+and what was corrected, so that this declaration can be checked against it.
+
+Date: 29 October 2026.
 
 ### Appendix D — Evidence checklist for the final submission
 

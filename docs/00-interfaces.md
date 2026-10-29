@@ -1,4 +1,4 @@
-# Module interface contract — lolping v0.3.2
+# Module interface contract — lolping v0.3.3
 
 This file is the single source of truth for module boundaries. Read it before
 writing code. Do **not** change a signature without telling the Lead: other
@@ -67,7 +67,7 @@ class Config:
     trigger_mouse_button: str          # "left" | "right" | "middle" | "x1" | "x2"
     wheel_radius: int                  # 60..400, default 130
     dead_zone: int                     # 5..wheel_radius-20, default 34
-    sector_count: int                  # fixed 8 in v0.3.2
+    sector_count: int                  # fixed 8 in v0.3.3
     sectors: list[str]                 # length == sector_count
     animation_tau: float               # 0.005..0.5, default 0.035
     mark_duration_ms: int              # 300..4000, default 900

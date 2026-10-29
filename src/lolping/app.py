@@ -210,6 +210,8 @@ class PingApp:
         # Pay the first-gesture cost now, while no gesture is in flight: it keeps
         # the mouse-capture race window at a few milliseconds instead of ~100 ms.
         self._overlay.warm_up()
+        if self._config.open_settings_on_start:
+            QTimer.singleShot(250, self._open_settings)
         log.info("lolping %s ready (%s)", __version__, self._trigger_hint())
         return self._app.exec_()
 
@@ -236,7 +238,7 @@ class PingApp:
         self._bridge.trigger_up.connect(self._on_trigger_up)
         self._bridge.cancel.connect(self._on_cancel)
         self._bridge.other_click.connect(self._on_other_click)
-        self._bridge.quit_requested.connect(self.quit)
+        self._bridge.toggle_requested.connect(self._toggle_pause)
         self._bridge.health_changed.connect(self._on_health)
         self._overlay.committed.connect(self._on_committed)
         self._overlay.hover_changed.connect(self._on_hover_changed)
@@ -408,10 +410,20 @@ class PingApp:
         if reason == QSystemTrayIcon.DoubleClick:
             self._open_settings()
 
+    def _toggle_pause(self) -> None:
+        """Flip the paused state; driven by the global hotkey and the tray menu."""
+        self._action_pause.setChecked(not self._paused)
+
     def _set_paused(self, paused: bool) -> None:
         self._paused = bool(paused)
         self._action_pause.setText("Resume" if self._paused else "Pause")
         self._tray.setToolTip(self._tooltip_text())
+        self._tray.showMessage(
+            "lolping",
+            "Pings paused." if self._paused else "Pings enabled.",
+            QSystemTrayIcon.Information,
+            2500,
+        )
         log.info("paused=%s", self._paused)
 
     def _open_settings(self) -> None:

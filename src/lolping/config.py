@@ -102,7 +102,11 @@ class Config:
     animation_tau: float = 0.035
     mark_duration_ms: int = 900
     sound_enabled: bool = False
-    quit_hotkey: str = "ctrl+shift+q"
+    #: Global hotkey that toggles pinging on/off (paused). Quitting is done from
+    #: the tray menu; a keyboard shortcut is for the action used while working.
+    toggle_hotkey: str = "ctrl+shift+q"
+    #: Show the settings window once at start-up.
+    open_settings_on_start: bool = True
     start_with_windows: bool = False
     show_labels: bool = True
     theme: str = "gold"
@@ -158,7 +162,14 @@ class Config:
             _number(data.get("mark_duration_ms"), 300, 4000, config.mark_duration_ms)
         )
         config.sound_enabled = _flag(data.get("sound_enabled"), config.sound_enabled)
-        config.quit_hotkey = _hotkey(data.get("quit_hotkey"), config.quit_hotkey)
+        # ``quit_hotkey`` is the 0.3.2 name for this setting; accept it so an
+        # existing config keeps its shortcut, then write only the new key.
+        config.toggle_hotkey = _hotkey(
+            data.get("toggle_hotkey") or data.get("quit_hotkey"), config.toggle_hotkey
+        )
+        config.open_settings_on_start = _flag(
+            data.get("open_settings_on_start"), config.open_settings_on_start
+        )
         config.start_with_windows = _flag(
             data.get("start_with_windows"), config.start_with_windows
         )

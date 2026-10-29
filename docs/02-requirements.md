@@ -1,8 +1,8 @@
-# 2. Requirements — lolping v0.3.2
+# 2. Requirements — lolping v0.3.3
 
 ## 2.1 Purpose and conventions
 
-This document states what lolping v0.3.2 must do. It derives from the frozen
+This document states what lolping v0.3.3 must do. It derives from the frozen
 module contract in `docs/00-interfaces.md`, extended by the v0.3.0 and v0.3.1 feature briefs
 for slice artwork, animation and sound, and is the reference for the design
 (`docs/03-design.md`) and tests (`docs/04-test-plan.md`). "Must" marks a
@@ -31,7 +31,7 @@ mandatory requirement. Values that are not fixed yet are written as
 | US-06 | As a user, I want to review what I pinged. | Every commit is appended to `pings.jsonl`; the tray menu opens the file. |
 | US-07 | As a user, I want the tool to start with Windows and stay in the tray. | Autostart is optional; there is no main window and no taskbar button. |
 | US-08 | As a user, I want to suspend the tool. | Pause makes the trigger inert; Resume restores it without a restart. |
-| US-09 | As a user, I want an unambiguous way to quit. | Ctrl+Shift+Q (configurable) and the tray Quit entry terminate the app cleanly. |
+| US-09 | As a user, I want to silence pings instantly when I switch to another task. | Ctrl+Shift+Q (configurable) toggles pause; the tray Quit entry terminates the app cleanly. |
 | US-10 | As a developer/evaluator, I want to measure how fast the wheel appears. | `--latency-probe` writes `frame_ms` and `commit_ms` to `latency.jsonl`. |
 | US-11 | As a user, I want the wheel to be readable at a glance and to sound right. | Each slice carries an icon, the wheel animates in, and optional cues confirm open, hover, commit and cancel. |
 
@@ -63,8 +63,8 @@ mandatory requirement. Values that are not fixed yet are written as
 | FR-10 | Settings… opens a modal dialog with: trigger modifier checkboxes, mouse-button selector, radius slider, dead-zone slider, eight sector-name fields, per-slice icon chooser, show-icons checkbox, icon-size slider, animation-speed control, mark-duration control, sound master-switch checkbox, volume slider, hover-ticks checkbox, show-labels checkbox, quit-hotkey field, start-with-Windows checkbox, theme selector and Reset to defaults. OK applies, Cancel discards. | Every listed control is present and labelled; Cancel changes nothing; OK persists the edits. |
 | FR-11 | Invalid input is handled in the dialog: numeric values clamp to documented ranges, malformed sector names or quit hotkeys give inline feedback, and the dialog never crashes. Reset to defaults restores section 2.4.6. | Slider extremes clamp; a malformed hotkey shows an inline message; Reset restores defaults. |
 | FR-12 | Settings are stored as JSON at `%APPDATA%\lolping-desktop\config.json` (or `--config PATH`), saved atomically. Loading never raises: unknown keys ignored, wrong types defaulted, numbers clamped, sector list padded or truncated to eight. A missing or corrupt file starts with defaults. | Deleting or corrupting the file still starts the app; a save produces valid JSON; a three-name config loads with eight. |
-| FR-13 | Accepted settings apply without a restart, including trigger and quit hotkeys. | Change the trigger to Ctrl + right: it works immediately. |
-| FR-14 | A configurable global quit hotkey (default Ctrl+Shift+Q) quits cleanly; hotkey text is parsed and shown canonically. | Ctrl+Shift+Q exits the app; the tray icon disappears; no traceback. |
+| FR-13 | Accepted settings apply without a restart, including the trigger, the pause hotkey and the start-up behaviour. | Change the trigger to Ctrl + right: it works immediately. |
+| FR-14 | A configurable global hotkey (default Ctrl+Shift+Q) toggles pinging between enabled and paused; hotkey text is parsed and shown canonically. | Ctrl+Shift+Q stops the wheel opening and shows a tray message; pressing it again restores pinging. |
 | FR-15 | When `start_with_windows` is enabled, the app registers to start at login; disabling removes the registration. Applied outside the dialog. Default off. | Enable, sign out and in: app starts in the tray; disable: no entry remains. |
 | FR-16 | `sound_enabled` is the master sound switch (default off). When it is on, the cues selected in FR-27 play; when it is off, no cue plays. | Master on: the enabled cues play. Master off: the wheel is silent. |
 
@@ -98,12 +98,13 @@ mandatory requirement. Values that are not fixed yet are written as
 | `trigger_mouse_button` | `left` | left, right, middle, x1, x2 |
 | `wheel_radius` | 130 | 60–400 (logical px) |
 | `dead_zone` | 34 | 5 to `wheel_radius − 20` |
-| `sector_count` | 8 | fixed at 8 in v0.3.2 |
+| `sector_count` | 8 | fixed at 8 in v0.3.3 |
 | `sectors` | On My Way, All-In, Assist Me, Need Vision, Enemy Missing, Enemy Vision, Retreat, Push | eight names |
 | `animation_tau` | 0.035 | 0.005–0.5 |
 | `mark_duration_ms` | 900 | 300–4000 |
 | `sound_enabled` | false | true / false |
-| `quit_hotkey` | `ctrl+shift+q` | modifiers + key |
+| `toggle_hotkey` | `ctrl+shift+q` | modifiers + key (pause / resume) |
+| `open_settings_on_start` | `true` | show the settings window once at start-up |
 | `start_with_windows` | false | true / false |
 | `show_labels` | true | true / false |
 | `theme` | `gold` | gold, blue, red |
@@ -173,7 +174,7 @@ and the next gesture uses the new values. Cancel saves nothing.
 **UC-03 — Pause and resume.** Pause makes the trigger inert and the menu offers
 Resume; Resume restores it. The ping log is unaffected.
 
-**UC-04 — Quit.** Tray Quit or the quit hotkey stops timers, closes overlays,
+**UC-04 — Quit.** Tray Quit stops timers, closes overlays,
 stops the input listener and exits cleanly.
 
 ## 2.7 Scope
@@ -185,7 +186,7 @@ stops the input listener and exits cleanly.
 | Open animation, layered release burst, synthesised sound cues | Sector counts other than eight |
 | Commit/cancel semantics and confirmation feedback | Network, multiplayer, rooms, shared logs |
 | Settings, JSON configuration, reset | Cross-platform builds, installer, auto-update |
-| Tray menu, pause/resume, quit hotkey, autostart | In-game HUD, voice, champion or cooldown data |
+| Tray menu, pause/resume, pause hotkey, start-up dialog, autostart | In-game HUD, voice, champion or cooldown data |
 | Local ping and latency logs | Windows versions other than Windows 11 |
 | DPI- and multi-monitor-aware placement | — |
 

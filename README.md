@@ -18,7 +18,7 @@ vector `QPainterPath` geometry generated in `src/lolping/assets.py`, and the
 sound cues are synthesised in `src/lolping/sounds.py`, so the repository
 contains no Riot Games assets and no binary media files.
 
-- Version: **0.3.2**
+- Version: **0.3.3**
 - Platform: **Windows 11** (64-bit)
 - Runtime: **Python 3.14**, **PyQt5 5.15.11**, **pynput 1.8.2**
 - No other runtime dependencies, no network access at runtime
@@ -51,7 +51,7 @@ contains no Riot Games assets and no binary media files.
   the window underneath. One overlay per monitor, positioned under the cursor.
 - Settings dialog: wheel radius, dead zone, sector names, per-slice icon choice,
   icon size, show icons, animation speed, mark duration, sound, volume, hover
-  ticks, quit hotkey, start with Windows, theme, reset to defaults.
+  ticks, pause hotkey, open settings at start-up, start with Windows, theme, reset to defaults.
 - System-tray menu: Settings, Ping history log, Open config folder,
   Pause/Resume, Quit.
 - Local JSONL log of every committed ping and an optional latency-probe mode.
@@ -79,7 +79,7 @@ contains `src`, `requirements.txt` and `pyproject.toml`.
 lolping starts in the system tray. Hold **Alt**, press and hold the **left
 mouse button**, drag away from the cursor position, and release over the sector
 you want. Press **Esc**, click the right mouse button, or release within the
-dead zone to cancel. Quit from the tray menu or with **Ctrl+Shift+Q**.
+dead zone to cancel. **Ctrl+Shift+Q** pauses or resumes pinging; quit from the tray menu.
 
 A packaged executable can be built from source as described in
 `docs/07-build-and-release.md`.
@@ -165,7 +165,7 @@ All user data lives in `%APPDATA%\lolping-desktop\`:
 - **Sound overlap.** The Windows `winsound` API plays one asynchronous sound at
   a time, so a newer cue interrupts the previous one. For short cues this is a
   deliberate trade-off, not a defect.
-- **Scope.** Windows only, fixed eight sectors in v0.3.2, no game awareness, no
+- **Scope.** Windows only, fixed eight sectors in v0.3.3, no game awareness, no
   team or room features, no cross-platform support.
 
 ## License

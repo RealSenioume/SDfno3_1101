@@ -133,7 +133,8 @@ class SettingsDialog(QDialog):
             sound_enabled=bool(self._sound_check.isChecked()),
             sound_volume=round(self._volume_slider.value() / 100.0, 2),
             sound_hover_ticks=bool(self._hover_ticks_check.isChecked()),
-            quit_hotkey=self._hotkey_edit.text().strip().lower().replace(" ", ""),
+            toggle_hotkey=self._toggle_hotkey_edit.text().strip().lower().replace(" ", ""),
+            open_settings_on_start=bool(self._start_settings_check.isChecked()),
             start_with_windows=bool(self._autostart_check.isChecked()),
             show_labels=bool(self._labels_check.isChecked()),
             theme=str(self._theme_combo.currentData() or self._base_config.theme),
@@ -383,18 +384,22 @@ class SettingsDialog(QDialog):
         layout = QVBoxLayout(group)
 
         hotkey_row = QHBoxLayout()
-        hotkey_row.addWidget(QLabel("Quit hotkey:", group))
-        self._hotkey_edit = QLineEdit(group)
-        self._hotkey_edit.setPlaceholderText("Ctrl+Shift+Q")
-        self._hotkey_edit.setMaxLength(64)
-        hotkey_row.addWidget(self._hotkey_edit, 1)
+        hotkey_row.addWidget(QLabel("Pause hotkey:", group))
+        self._toggle_hotkey_edit = QLineEdit(group)
+        self._toggle_hotkey_edit.setPlaceholderText("Ctrl+Shift+Q")
+        self._toggle_hotkey_edit.setMaxLength(64)
+        hotkey_row.addWidget(self._toggle_hotkey_edit, 1)
         layout.addLayout(hotkey_row)
-        self._hotkey_edit.setToolTip(
-            "Modifiers plus one key, for example Ctrl+Shift+Q."
+        self._toggle_hotkey_edit.setToolTip(
+            "Modifiers plus one key, for example Ctrl+Shift+Q. Pressing it pauses "
+            "or resumes pinging; quitting is done from the tray menu."
         )
 
         self._autostart_check = QCheckBox("Start with Windows", group)
         layout.addWidget(self._autostart_check)
+
+        self._start_settings_check = QCheckBox("Open settings when lolping starts", group)
+        layout.addWidget(self._start_settings_check)
         return group
 
     @staticmethod
@@ -429,7 +434,7 @@ class SettingsDialog(QDialog):
             edit.textChanged.connect(self._clear_error)
         for combo in self._sector_icon_combos:
             combo.currentIndexChanged.connect(self._clear_error)
-        self._hotkey_edit.textChanged.connect(self._clear_error)
+        self._toggle_hotkey_edit.textChanged.connect(self._clear_error)
         self._button_combo.currentIndexChanged.connect(self._clear_error)
         self._theme_combo.currentIndexChanged.connect(self._clear_error)
         self._sound_check.toggled.connect(self._clear_error)
@@ -471,7 +476,7 @@ class SettingsDialog(QDialog):
             min(max(int(config.mark_duration_ms), _MARK_MIN_MS), _MARK_MAX_MS)
         )
         self._sound_check.setChecked(bool(config.sound_enabled))
-        self._hotkey_edit.setText(str(config.quit_hotkey))
+        self._toggle_hotkey_edit.setText(str(config.toggle_hotkey))
         self._autostart_check.setChecked(bool(config.start_with_windows))
         self._labels_check.setChecked(bool(config.show_labels))
         self._icons_check.setChecked(bool(config.show_icons))
@@ -541,19 +546,19 @@ class SettingsDialog(QDialog):
         if not any(box.isChecked() for box in self._modifier_boxes.values()):
             return "Pick at least one trigger modifier (Ctrl, Alt, Shift or Win)."
 
-        hotkey = self._hotkey_edit.text().strip()
+        hotkey = self._toggle_hotkey_edit.text().strip()
         if not hotkey:
-            return "Enter a quit hotkey, for example Ctrl+Shift+Q."
+            return "Enter a pause hotkey, for example Ctrl+Shift+Q."
         try:
             keys = parse_hotkey(hotkey)
         except ValueError as exc:
-            log.debug("rejected quit hotkey %r: %s", hotkey, exc)
-            return f"Invalid quit hotkey: {exc}. Example: Ctrl+Shift+Q."
+            log.debug("rejected pause hotkey %r: %s", hotkey, exc)
+            return f"Invalid pause hotkey: {exc}. Example: Ctrl+Shift+Q."
         except (TypeError, AttributeError):  # pragma: no cover - defensive
-            log.exception("quit hotkey parser failed on %r", hotkey)
-            return "The quit hotkey could not be validated. Example: Ctrl+Shift+Q."
+            log.exception("pause hotkey parser failed on %r", hotkey)
+            return "The pause hotkey could not be validated. Example: Ctrl+Shift+Q."
         if not keys:
-            return "Invalid quit hotkey. Example: Ctrl+Shift+Q."
+            return "Invalid pause hotkey. Example: Ctrl+Shift+Q."
 
         radius = int(self._radius_slider.value())
         if int(self._dead_slider.value()) > radius - _DEAD_MARGIN:

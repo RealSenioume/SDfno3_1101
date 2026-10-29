@@ -42,7 +42,7 @@ class HookTestBase(unittest.TestCase):
         self.bridge.other_click.connect(
             lambda x, y: self.events.append(("other", x, y))
         )
-        self.bridge.quit_requested.connect(lambda: self.events.append(("quit",)))
+        self.bridge.toggle_requested.connect(lambda: self.events.append(("toggle",)))
 
     def tearDown(self) -> None:
         # The listeners were never started, so only the state needs dropping.
@@ -129,28 +129,28 @@ class TestCancelPaths(HookTestBase):
         self.assertEqual(self.kinds(), ["down", "cancel", "down"])
 
 
-class TestQuitHotkey(HookTestBase):
-    def test_ctrl_shift_q_quits(self) -> None:
+class TestPauseHotkey(HookTestBase):
+    def test_ctrl_shift_q_toggles(self) -> None:
         self.hook._on_press(keyboard.Key.ctrl_l)
         self.hook._on_press(keyboard.Key.shift_l)
         self.hook._on_press(keyboard.KeyCode.from_vk(0x51))  # Q
-        self.assertEqual(self.kinds(), ["quit"])
+        self.assertEqual(self.kinds(), ["toggle"])
 
-    def test_q_alone_does_not_quit(self) -> None:
+    def test_q_alone_does_not_toggle(self) -> None:
         self.hook._on_press(keyboard.KeyCode.from_vk(0x51))
         self.assertEqual(self.kinds(), [])
 
-    def test_partial_combo_does_not_quit(self) -> None:
+    def test_partial_combo_does_not_toggle(self) -> None:
         self.hook._on_press(keyboard.KeyCode.from_vk(0x11))  # ctrl
         self.hook._on_press(keyboard.KeyCode.from_vk(0x51))  # Q
         self.assertEqual(self.kinds(), [])
 
-    def test_custom_quit_hotkey(self) -> None:
-        self.config.quit_hotkey = "alt+f4"
+    def test_custom_pause_hotkey(self) -> None:
+        self.config.toggle_hotkey = "alt+f4"
         self.hook.rebind(self.config)
         self.hook._on_press(keyboard.Key.alt_l)
         self.hook._on_press(keyboard.Key.f4)
-        self.assertEqual(self.kinds(), ["quit"])
+        self.assertEqual(self.kinds(), ["toggle"])
 
     def test_letter_uses_virtual_key_when_ctrl_is_held(self) -> None:
         # With Ctrl down pynput may report a control character; the virtual key
@@ -158,7 +158,7 @@ class TestQuitHotkey(HookTestBase):
         self.hook._on_press(keyboard.Key.ctrl_l)
         self.hook._on_press(keyboard.Key.shift_l)
         self.hook._on_press(keyboard.KeyCode(vk=0x51, char="\x11"))
-        self.assertEqual(self.kinds(), ["quit"])
+        self.assertEqual(self.kinds(), ["toggle"])
 
 
 class TestKeyTokens(HookTestBase):

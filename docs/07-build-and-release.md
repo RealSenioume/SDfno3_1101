@@ -2,7 +2,7 @@
 
 This document explains how to set up a development environment, run the tests,
 build the Windows executable, verify it, and publish a release of **lolping
-v0.3.2**.
+v0.3.3**.
 
 It is written for the build owner and for any teammate who has to reproduce a
 release. The short version is at the top, the reasoning and pitfalls follow.
@@ -304,11 +304,11 @@ both versions.
 `src/lolping/__init__.py` contains the single source of truth:
 
 ```python
-__version__ = "0.3.2"
+__version__ = "0.3.3"
 ```
 
 It is used by `--version`, the window title, the log banner, and by
-`build.ps1` for the zip name (`release\lolping-0.3.2-win64.zip`). To cut a
+`build.ps1` for the zip name (`release\lolping-0.3.3-win64.zip`). To cut a
 release:
 
 1. Bump `__version__`.
@@ -317,11 +317,11 @@ release:
 4. Commit, then tag and push:
 
    ```powershell
-   git tag -a v0.3.2 -m "lolping v0.3.2"
-   git push origin v0.3.2
+   git tag -a v0.3.3 -m "lolping v0.3.3"
+   git push origin v0.3.3
    ```
 
-5. Attach `release\lolping-0.3.2-win64.zip` and its `.sha256` to the tag/release.
+5. Attach `release\lolping-0.3.3-win64.zip` and its `.sha256` to the tag/release.
 
 The tag name and `__version__` must match; the build script derives the archive
 name from `__version__`, so a stale `__version__` produces a misleading zip.
@@ -331,7 +331,7 @@ name from `__version__`, so a stale `__version__` produces a misleading zip.
 ## 8. What the release zip contains
 
 ```
-lolping-0.3.2-win64.zip
+lolping-0.3.3-win64.zip
 └── lolping/
     ├── lolping.exe          windowed executable, no console
     ├── README.md            copied by build.ps1
@@ -346,8 +346,8 @@ per-user `Run` key for "start with Windows" (toggled from Settings).
 Verifying a download:
 
 ```powershell
-Get-FileHash .\lolping-0.3.2-win64.zip -Algorithm SHA256
-Get-Content .\lolping-0.3.2-win64.zip.sha256
+Get-FileHash .\lolping-0.3.3-win64.zip -Algorithm SHA256
+Get-Content .\lolping-0.3.3-win64.zip.sha256
 ```
 
 ---
@@ -443,9 +443,9 @@ Run every line from the repository root and keep the output for the report.
       `PASS` for p95 `frame_ms` <= 50 ms; paste the Markdown table and verdict
       into the report.
 - [ ] Release zip extracted to an empty folder and run from there; README and
-      the `--version` output both show `0.3.2`.
+      the `--version` output both show `0.3.3`.
 - [ ] `Get-FileHash` of the zip matches the published `.sha256`.
-- [ ] `__version__` bumped, tag `v0.3.2` created and pushed, zip attached.
+- [ ] `__version__` bumped, tag `v0.3.3` created and pushed, zip attached.
 - [ ] `docs/07-build-and-release.md` (this file) still matches the script.
 
 ---
@@ -464,7 +464,7 @@ $env:PYTHONPATH = "src"
 Copy-Item README.md dist\lolping\
 $env:QT_QPA_PLATFORM = "offscreen"
 .\dist\lolping\lolping.exe --self-test   # expect exit code 0
-Compress-Archive -Path dist\lolping -DestinationPath release\lolping-0.3.2-win64.zip
+Compress-Archive -Path dist\lolping -DestinationPath release\lolping-0.3.3-win64.zip
 ```
 
 The script is still the reference implementation: it also checks the

@@ -42,7 +42,7 @@ class InputBridge(QObject):
     trigger_up = pyqtSignal(float)  # perf_counter timestamp
     cancel = pyqtSignal()  # Esc pressed
     other_click = pyqtSignal(int, int)  # right/middle click while the wheel is open
-    quit_requested = pyqtSignal()  # configured quit hotkey
+    toggle_requested = pyqtSignal()  # configured pause/enable hotkey
     health_changed = pyqtSignal(bool)  # hook listeners alive?
 
 
@@ -170,17 +170,17 @@ class _State:
         self.modifiers: set[str] = set()
         self.required_modifiers: frozenset[str] = frozenset(config.trigger_modifiers)
         self.trigger_button = _mouse_button(config.trigger_mouse_button)
-        self.quit_keys: frozenset[str] = frozenset()
+        self.toggle_keys: frozenset[str] = frozenset()
         self.wheel_open = False
         self.down_at = 0.0
         self.update_hotkeys(config)
 
     def update_hotkeys(self, config: Config) -> None:
         try:
-            self.quit_keys = parse_hotkey(config.quit_hotkey)
+            self.toggle_keys = parse_hotkey(config.toggle_hotkey)
         except ValueError:
-            log.warning("invalid quit hotkey %r, using Ctrl+Shift+Q", config.quit_hotkey)
-            self.quit_keys = parse_hotkey("ctrl+shift+q")
+            log.warning("invalid pause hotkey %r, using Ctrl+Shift+Q", config.toggle_hotkey)
+            self.toggle_keys = parse_hotkey("ctrl+shift+q")
         self.required_modifiers = frozenset(config.trigger_modifiers)
         self.trigger_button = _mouse_button(config.trigger_mouse_button)
 
@@ -285,7 +285,7 @@ class InputHook:
             if token is None:
                 return
             emit_cancel = False
-            emit_quit = False
+            emit_toggle = False
             with self._state.lock:
                 already = token in self._state.pressed
                 self._state.pressed.add(token)
@@ -296,13 +296,13 @@ class InputHook:
                     # in the GUI, so the following mouse-up must not commit.
                     emit_cancel = True
                     self._state.wheel_open = False
-                keys = self._state.quit_keys
+                keys = self._state.toggle_keys
                 if keys and not already and keys <= self._state.pressed:
                     if token not in MODIFIER_NAMES:
-                        emit_quit = True
-            if emit_quit:
-                log.info("quit hotkey pressed")
-                self._bridge.quit_requested.emit()
+                        emit_toggle = True
+            if emit_toggle:
+                log.info("pause hotkey pressed")
+                self._bridge.toggle_requested.emit()
                 return
             if emit_cancel:
                 self._bridge.cancel.emit()
