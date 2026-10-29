@@ -1,4 +1,4 @@
-# 1. Proposal — lolping v0.3.3
+# 1. Proposal — lolping v0.3.4
 
 ## 1.1 Background and problem statement
 
@@ -12,7 +12,7 @@ The project starts from the course-provided prototype
 `pingWheel_BETA_v01_01.py`, a single-file PyQt5 script that drew a gold-on-grey
 wheel and committed a label on mouse release. It proved the interaction but had
 hard-coded labels and trigger, no settings, no logging, no error handling and no
-tests. v0.3.3 turns it into a documented package against a frozen module
+tests. v0.3.4 turns it into a documented package against a frozen module
 contract (`docs/00-interfaces.md`).
 
 The engineering question is whether a small Python/Qt desktop application can
@@ -23,7 +23,7 @@ developers implement it in parallel in four weeks.
 
 ## 1.2 Aim
 
-Deliver lolping v0.3.3, a Windows 11 desktop application that opens an
+Deliver lolping v0.3.4, a Windows 11 desktop application that opens an
 eight-sector ping wheel at the cursor on a configurable gesture, commits or
 cancels correctly, persists settings and a local ping log, and meets the
 documented usability and performance requirements within four weeks.
@@ -47,7 +47,7 @@ documented usability and performance requirements within four weeks.
 
 ## 1.4 Scope
 
-| In scope (v0.3.3) | Out of scope |
+| In scope (v0.3.4) | Out of scope |
 | --- | --- |
 | Eight-sector overlay wheel opened by a hold-and-drag gesture | Any interaction with the game client, game memory or Riot API |
 | Configurable trigger, commit and cancel behaviours, confirmation mark | Sector counts other than eight |
@@ -114,7 +114,7 @@ rather than by changing stack.
 
 ## 1.9 Deliverables and evaluation
 
-Deliverables: the `src/lolping/` package (v0.3.3), tests, build definition and
+Deliverables: the `src/lolping/` package (v0.3.4), tests, build definition and
 tools, `README.md` plus `docs/01`–`docs/07`, the evaluation evidence set, and
 the final report structured by `docs/06-report-outline.md`.
 

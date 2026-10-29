@@ -13,9 +13,10 @@ from __future__ import annotations
 
 import logging
 from dataclasses import replace
+from typing import Callable
 
-from PyQt5.QtCore import Qt
-from PyQt5.QtGui import QIntValidator
+from PyQt5.QtCore import QPoint, QPointF, QRectF, QSize, Qt, QTimer
+from PyQt5.QtGui import QColor, QIntValidator, QPainter
 from PyQt5.QtWidgets import (
     QCheckBox,
     QComboBox,
@@ -80,12 +81,70 @@ _VOLUME_MIN = 0
 _VOLUME_MAX = 100
 
 
+class ToggleSwitch(QCheckBox):
+    """A small pill-shaped on/off switch.
+
+    ``QCheckBox`` provides the behaviour (checked state, toggled signal,
+    accessibility, keyboard space) and only the indicator is custom-painted, so
+    it stays a native widget that tests can drive with ``setChecked``.
+    """
+
+    def __init__(self, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self.setCursor(Qt.PointingHandCursor)
+        self.setFixedSize(38, 20)
+        self.setToolTip("On: the wheel can be triggered. Off: it cannot.")
+
+    def paintEvent(self, event) -> None:  # noqa: N802 - Qt name
+        painter = QPainter(self)
+        try:
+            painter.setRenderHint(QPainter.Antialiasing, True)
+            radius = self.height() / 2.0
+            track = QColor(64, 156, 96) if self.isChecked() else QColor(150, 150, 150)
+            if not self.isEnabled():
+                track.setAlpha(110)
+            painter.setPen(Qt.NoPen)
+            painter.setBrush(track)
+            painter.drawRoundedRect(
+                QRectF(0.0, 0.0, float(self.width()), float(self.height())),
+                radius,
+                radius,
+            )
+            knob_radius = radius - 3.0
+            centre = self.width() - radius if self.isChecked() else radius
+            painter.setBrush(QColor(246, 246, 246))
+            painter.drawEllipse(QPointF(centre, radius), knob_radius, knob_radius)
+        finally:
+            painter.end()
+
+    def hitButton(self, pos: QPoint) -> bool:  # noqa: N802 - Qt name
+        # QCheckBox only counts clicks inside the style's (tiny) indicator rect;
+        # the indicator is custom-painted across the whole widget, so accept
+        # every click that lands on the pill.
+        return self.rect().contains(pos)
+
+    def sizeHint(self) -> QSize:  # noqa: N802 - Qt name
+        return QSize(38, 20)
+
+
 class SettingsDialog(QDialog):
     """Edit every user-tunable field of :class:`~lolping.config.Config`."""
 
-    def __init__(self, config: Config, parent: QWidget | None = None) -> None:
+    def __init__(
+        self,
+        config: Config,
+        parent: QWidget | None = None,
+        pause_state_getter: Callable[[], bool] | None = None,
+        pause_toggled: Callable[[bool], None] | None = None,
+    ) -> None:
         super().__init__(parent)
         self._base_config = config
+        # The trigger switch shows run-time state, which lives in the
+        # application rather than in the config, so it is read through a
+        # callback and written back through another one.
+        self._pause_state_getter = pause_state_getter
+        self._pause_toggled = pause_toggled
+        self._updating_switch = False
         self._modifier_boxes: dict[str, QCheckBox] = {}
         self._sector_edits: list[QLineEdit] = []
         self._sector_icon_combos: list[QComboBox] = []
@@ -98,6 +157,13 @@ class SettingsDialog(QDialog):
         self._build_ui()
         self._connect_signals()
         self._load_config(config)
+        if self._pause_state_getter is not None:
+            # Poll instead of relying on a signal: the application can change
+            # state from the hotkey thread while this modal dialog is open.
+            self._switch_timer = QTimer(self)
+            self._switch_timer.setInterval(200)
+            self._switch_timer.timeout.connect(self._sync_trigger_switch)
+            self._switch_timer.start()
 
     # ------------------------------------------------------------------ public
     def edited_config(self) -> Config:
@@ -147,9 +213,14 @@ class SettingsDialog(QDialog):
         )
 
     @staticmethod
-    def edit(config: Config, parent: QWidget | None = None) -> Config | None:
+    def edit(
+        config: Config,
+        parent: QWidget | None = None,
+        pause_state_getter: Callable[[], bool] | None = None,
+        pause_toggled: Callable[[bool], None] | None = None,
+    ) -> Config | None:
         """Show the dialog modally; return the edited config or ``None``."""
-        dialog = SettingsDialog(config, parent)
+        dialog = SettingsDialog(config, parent, pause_state_getter, pause_toggled)
         try:
             accepted = dialog.exec_() == QDialog.Accepted
             return dialog.edited_config() if accepted else None
@@ -383,6 +454,18 @@ class SettingsDialog(QDialog):
         group = QGroupBox("System", parent)
         layout = QVBoxLayout(group)
 
+        trigger_row = QHBoxLayout()
+        self._trigger_switch = ToggleSwitch(group)
+        self._trigger_switch.setToolTip(
+            "Turn the ping wheel trigger on or off. This is the same state as the "
+            "pause hotkey and the tray entry, and it applies immediately - Cancel "
+            "does not undo it."
+        )
+        trigger_row.addWidget(self._trigger_switch)
+        trigger_row.addWidget(QLabel("Ping wheel enabled", group))
+        trigger_row.addStretch(1)
+        layout.addLayout(trigger_row)
+
         hotkey_row = QHBoxLayout()
         hotkey_row.addWidget(QLabel("Pause hotkey:", group))
         self._toggle_hotkey_edit = QLineEdit(group)
@@ -435,6 +518,7 @@ class SettingsDialog(QDialog):
         for combo in self._sector_icon_combos:
             combo.currentIndexChanged.connect(self._clear_error)
         self._toggle_hotkey_edit.textChanged.connect(self._clear_error)
+        self._trigger_switch.toggled.connect(self._on_trigger_switch_toggled)
         self._button_combo.currentIndexChanged.connect(self._clear_error)
         self._theme_combo.currentIndexChanged.connect(self._clear_error)
         self._sound_check.toggled.connect(self._clear_error)
@@ -477,6 +561,7 @@ class SettingsDialog(QDialog):
         )
         self._sound_check.setChecked(bool(config.sound_enabled))
         self._toggle_hotkey_edit.setText(str(config.toggle_hotkey))
+        self._sync_trigger_switch()
         self._autostart_check.setChecked(bool(config.start_with_windows))
         self._labels_check.setChecked(bool(config.show_labels))
         self._icons_check.setChecked(bool(config.show_icons))
@@ -539,6 +624,25 @@ class SettingsDialog(QDialog):
         for widget in self._icon_widgets:
             widget.setEnabled(bool(checked))
         self._clear_error()
+
+    def _on_trigger_switch_toggled(self, enabled: bool) -> None:
+        """Forward a user toggle to the application (ignoring programmatic ones)."""
+        if self._updating_switch or self._pause_toggled is None:
+            return
+        self._pause_toggled(bool(enabled))
+
+    def _sync_trigger_switch(self) -> None:
+        """Mirror the application's paused state without echoing a signal."""
+        if self._pause_state_getter is None:
+            return
+        enabled = not bool(self._pause_state_getter())
+        if self._trigger_switch.isChecked() == enabled:
+            return
+        self._updating_switch = True
+        try:
+            self._trigger_switch.setChecked(enabled)
+        finally:
+            self._updating_switch = False
 
     # ---------------------------------------------------------------- validation
     def _validate(self) -> str | None:

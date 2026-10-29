@@ -55,7 +55,7 @@ class TestSettingsActivation(unittest.TestCase):
 
         controller = self.controller
 
-        def fake_edit(config, parent=None):
+        def fake_edit(config, parent=None, pause_state_getter=None, pause_toggled=None):
             self.opened.append(1)
             # Simulate a queued second activation arriving while the first modal
             # dialog is still open: the guard must swallow it.
@@ -145,6 +145,60 @@ class TestPauseToggle(unittest.TestCase):
         self.controller._toggle_pause()
         self.assertFalse(self.controller._paused)
         self.assertEqual(self.controller._action_pause.text(), "Pause")
+
+
+class TestTriggerSwitchSync(unittest.TestCase):
+    """The settings switch is a live view of the run-time paused state."""
+
+    def setUp(self) -> None:
+        global _APP
+        _APP = QApplication.instance() or QApplication([])
+        self.paused = False
+        self.calls: list[bool] = []
+
+        def getter() -> bool:
+            return self.paused
+
+        def toggled(enabled: bool) -> None:
+            self.calls.append(enabled)
+
+        self.dialog = SettingsDialog(Config(), None, getter, toggled)
+        self.dialog._sync_trigger_switch()
+        self.addCleanup(self.dialog.deleteLater)
+
+    def test_starts_checked_when_pings_are_enabled(self) -> None:
+        self.assertTrue(self.dialog._trigger_switch.isChecked())
+
+    def test_follows_an_external_pause(self) -> None:
+        self.paused = True
+        self.dialog._sync_trigger_switch()
+        self.assertFalse(self.dialog._trigger_switch.isChecked())
+
+    def test_a_mouse_click_on_the_pill_toggles(self) -> None:
+        # The native QCheckBox hit area is only the small indicator, so clicking
+        # the right-hand side of the custom-drawn pill must still work.
+        from PyQt5.QtCore import QPoint, Qt
+        from PyQt5.QtTest import QTest
+
+        self.dialog.show()
+        QApplication.processEvents()
+        switch = self.dialog._trigger_switch
+        QTest.mouseClick(
+            switch,
+            Qt.LeftButton,
+            Qt.NoModifier,
+            QPoint(switch.width() - 4, switch.height() // 2),
+        )
+        QApplication.processEvents()
+        self.assertEqual(self.calls, [False])
+
+    def test_a_user_toggle_is_forwarded(self) -> None:
+        self.dialog._trigger_switch.setChecked(False)
+        self.assertEqual(self.calls, [False])
+        # programmatic syncs must not echo back into the app
+        self.paused = True
+        self.dialog._sync_trigger_switch()
+        self.assertEqual(self.calls, [False])
 
 
 if __name__ == "__main__":

@@ -87,7 +87,7 @@ For more details during development, check out the docs.
 - 10.27.2026
 
 # V0.3.2 Update
-- Reworked the wheel's appearance after the in-game League wheel: a barely-there disc, eight gold separators, light beams that spill past the rim, and a centre medallion with PING and a BACK hint. It ships as an optional `lol` theme; the original three themes are untouched.
+- Reworked the wheel's appearance against the in-game reference I use every day: a barely-there disc, eight gold separators, light beams that spill past the rim, and a centre medallion with PING and a BACK hint. It ships as an optional `lol` theme; the original three themes are untouched.
 
 - The icons were the part I could not simply copy. The reference art belongs to Riot, and this project has promised since the first commit to ship no third-party artwork. So the mechanism ships and the artwork does not: slice icons load from `assets/icons/<id>.png` on my own disk, that folder is git-ignored, and a missing file falls back to the vector icon. A fresh clone still works; it just looks like ours rather than theirs.
 
@@ -102,7 +102,7 @@ For more details during development, check out the docs.
 - 10.29.2026
 
 # V0.3.3 Update
-- Changed Ctrl+Shift+Q from "quit" to "pause/resume". Quitting is still available: right-click the tray icon, open its menu and choose Quit. What I actually press while working is the hotkey that silences the marks.
+- Changed Ctrl+Shift+Q from quitting to pausing. Quitting is a once-per-session action; silencing the pings is the one I actually press while working. The tray menu still quits.
 
 - Pausing also releases the mouse guard, so while paused the desktop behaves normally again instead of having Alt + click swallowed by a tool I am not using.
 
@@ -113,5 +113,16 @@ For more details during development, check out the docs.
 - The settings window opens once at start-up, because launching and then immediately changing the trigger is what I do every day. There is a checkbox for people who disagree, which is also my way of admitting I might.
 
 - 153 tests now; the toggle and the old-key migration are pinned so a later rename cannot quietly break someone's config.
+
+- 10.29.2026
+
+# V0.3.4 Update
+- Added a switch above the pause hotkey that turns the ping wheel trigger on and off, and it follows the hotkey live: press Ctrl+Shift+Q while the dialog is open and the switch moves with it. A setting that can disagree with the thing it controls is worse than no setting.
+
+- The first version looked right but was only clickable on the native indicator square; the rest of the pill swallowed clicks. A custom-painted button does not inherit a custom hit area, so the whole rectangle has to be accepted explicitly.
+
+- It applies immediately, so Cancel does not undo it - matching the hotkey, which has never asked for confirmation.
+
+- 157 tests; the live sync, the fact that an automatic update does not bounce back into the app, and a click on the right-hand side of the pill are all pinned.
 
 - 10.29.2026

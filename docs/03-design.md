@@ -1,6 +1,6 @@
 # lolping — Design Document
 
-Version 0.3.3 · Windows 11 · Python 3.14 · PyQt5 5.15.11 · pynput 1.8.2
+Version 0.3.4 · Windows 11 · Python 3.14 · PyQt5 5.15.11 · pynput 1.8.2
 
 This document explains *how* the system is built and *why* it is built that way.
 Requirements live in [`02-requirements.md`](02-requirements.md), the test
@@ -489,7 +489,7 @@ expected results (`docs/04-test-plan.md`, TC-28 … TC-30).
 | `trigger_mouse_button` | str | `"left"` | left/right/middle/x1/x2 |
 | `wheel_radius` | int | 130 | 60–400 |
 | `dead_zone` | int | 34 | 5–(`wheel_radius`−20) |
-| `sector_count` | int | 8 | fixed in 0.3.3 |
+| `sector_count` | int | 8 | fixed in 0.3.4 |
 | `sectors` | list[str] | LoL-style names | length == `sector_count` |
 | `animation_tau` | float | 0.035 | 0.005–0.5 s |
 | `mark_duration_ms` | int | 900 | 300–4000 |
@@ -647,7 +647,7 @@ Design-inherent, documented rather than hidden:
    desktop can still start a selection or an icon drag.
 4. Mixed-DPI multi-monitor: correct on the active screen only.
 5. Windows only — `msvcrt`, `winreg`, `winsound` are used directly.
-6. Pause is manual; fullscreen-app auto-pause is not implemented in 0.3.3.
+6. Pause is manual; fullscreen-app auto-pause is not implemented in 0.3.4.
 7. Sound cues cannot overlap: `winsound` stops the previous asynchronous sound
    when a new one starts. Documented as a trade-off; with 28–200 ms cues the
    audible effect is negligible.
@@ -705,3 +705,18 @@ The skin is a second renderer behind the same state machine, selected by
 | --- | --- | --- | --- |
 | D18 | Ship no icon art; allow local, git-ignored PNG overrides | Bundle downloaded icons | The repository stays licence-clean; a fresh clone shows vector icons until the user adds files |
 | D19 | Click without drag sends the basic ping (on by default) | Click always cancels | Matches the reference interaction; can be switched off in Settings |
+
+## 17. Addendum: the trigger switch
+
+The switch in the settings window is not a config field: it is a live view of the
+application's run-time paused state, which the hotkey and the tray entry also
+change. The dialog therefore receives a getter and a setter rather than reading a
+value, polls the getter every 200 ms while it is open (a modal dialog cannot rely
+on the hotkey thread delivering a queued signal at a convenient moment), and
+suppresses its own `toggled` echo when the value arrives from outside. Turning the
+switch applies immediately; `Cancel` does not undo it, matching the hotkey.
+
+| # | Decision | Alternative | Consequence |
+| --- | --- | --- | --- |
+| D20 | The switch applies immediately and is excluded from OK/Cancel | Treat it as a normal config field | It can never disagree with the hotkey; the user must press the switch again to revert |
+

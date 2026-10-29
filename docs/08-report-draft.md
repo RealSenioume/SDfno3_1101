@@ -3,7 +3,7 @@
 **Course:** SD5913 — Semester 1
 **Author:** Zhexian Tao
 **Student repository:** <https://github.com/RealSenioume/SDfno3_1101>
-**Version described:** 0.3.3
+**Version described:** 0.3.4
 
 ---
 
@@ -15,7 +15,7 @@ game. That gesture is fluent, and it is locked inside one application. This
 project re-implements the gesture as a standalone Windows desktop overlay so it
 can be used while presenting, streaming, tutoring or reviewing a match.
 
-The delivered artefact, `lolping` 0.3.3, is a tray-resident Python/PyQt5
+The delivered artefact, `lolping` 0.3.4, is a tray-resident Python/PyQt5
 application. It installs global keyboard and mouse hooks, draws a translucent
 always-on-top wheel centred on the pointer without stealing focus, animates the
 selection with frame-rate-independent exponential smoothing, leaves a fading
@@ -128,7 +128,7 @@ optional local-network rooms. It is a mature, cross-platform product.
 
 The present project differs deliberately:
 
-| Aspect | lolPing | lolping 0.3.3 |
+| Aspect | lolPing | lolping 0.3.4 |
 | --- | --- | --- |
 | Stack | Electron + TypeScript + C++ helper | Python 3.14 + PyQt5 + pynput |
 | Input suppression | Helper swallows Alt+drag | Cannot suppress; documented limitation |
@@ -589,18 +589,18 @@ centre (basic) ping instead of cancelling, which is how the reference wheel
 behaves. The skin is drawn entirely in code, so the repository still ships no
 Riot artwork; slice icons can be overridden by local PNG files that are
 git-ignored, and the loader falls back to the vector icon when a file is absent.
-**What 0.3.3 changed, and why.** Two behaviours turned out to be wrong in the
+**What 0.3.3 and 0.3.4 changed, and why.** Two behaviours turned out to be wrong in the
 hands of the person using it. Ctrl+Shift+Q was bound to *quit*, which is the
 action needed once per session; what is needed many times an hour is to silence
 pings, so the hotkey now toggles pause (and pausing also releases the mouse
 guard, so the desktop behaves normally again). Second, the settings window now
 opens once at start-up, because the first thing anyone does after launching is
-adjust it; a checkbox turns that off. Both are input/UI changes: no paint code
+adjust it; a checkbox turns that off. Version 0.3.4 adds a switch above the hotkey field that both shows and sets whether the wheel can be triggered: it follows the hotkey and the tray entry live, and it applies immediately, so Cancel does not undo it. All three are input/UI changes: no paint code
 was touched, which is why the Section 6.3 measurements still describe the
 delivered build.
 
 Because the paint path changed, the latency figures in Section 6.3 were
-re-measured on the 0.3.2 build with this skin active (0.3.3 changes input handling only): the skin costs about one millisecond
+re-measured on the 0.3.2 build with this skin active (0.3.3 and 0.3.4 change input handling only): the skin costs about one millisecond
 at p90 and none of the 50 ms budget.
 
 ---
@@ -723,7 +723,7 @@ the most painting work, at eight additive radial-gradient beams per frame.
    the harness's own pause between press and release; it is reported because the
    probe records it, not because it says anything about responsiveness.
 6. These figures were measured on the 0.3.2 build, which is the build that ships
-   this paint path; version 0.3.3 changes input handling and the start-up dialog
+   this paint path; versions 0.3.3 and 0.3.4 change input handling and the start-up dialog
    only, so the measured path is still the delivered one. The archived runs remain
    useful as a controlled comparison: v0.3.0 (before the warm-up), v0.3.1 (before
    the skin), v0.3.2 (this run).
@@ -801,7 +801,7 @@ goal into a number and an argument.
 4. **Mixed-DPI multi-monitor.** Correct on the screen where the wheel opens;
    marks stay on that screen.
 5. **Windows only.** `msvcrt`, `winreg` and `winsound` are used directly.
-6. **No fullscreen auto-pause.** Pausing is manual in 0.3.3.
+6. **No fullscreen auto-pause.** Pausing is manual in 0.3.4.
 7. **Single-author evaluation.** The latency and usability data describe one
    machine and one user.
 

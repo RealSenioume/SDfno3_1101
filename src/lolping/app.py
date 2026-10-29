@@ -414,6 +414,12 @@ class PingApp:
         """Flip the paused state; driven by the global hotkey and the tray menu."""
         self._action_pause.setChecked(not self._paused)
 
+    def _set_trigger_enabled(self, enabled: bool) -> None:
+        """Apply the settings switch to the run-time paused state."""
+        if self._paused == (not enabled):
+            return
+        self._action_pause.setChecked(not enabled)
+
     def _set_paused(self, paused: bool) -> None:
         self._paused = bool(paused)
         self._action_pause.setText("Resume" if self._paused else "Pause")
@@ -433,7 +439,12 @@ class PingApp:
             return
         self._settings_open = True
         try:
-            edited = SettingsDialog.edit(self._config, None)
+            edited = SettingsDialog.edit(
+                self._config,
+                None,
+                pause_state_getter=lambda: self._paused,
+                pause_toggled=self._set_trigger_enabled,
+            )
         finally:
             self._settings_open = False
         if edited is None:

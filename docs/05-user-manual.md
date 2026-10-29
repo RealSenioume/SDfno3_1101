@@ -1,4 +1,4 @@
-# 5. User manual — lolping v0.3.3
+# 5. User manual — lolping v0.3.4
 
 ## 5.1 What lolping is
 
@@ -121,6 +121,7 @@ Cancel discards them. **Reset to defaults** restores every value below.
 | Enable sounds | Checkbox | Off | Master switch for all sound cues. |
 | Volume | Slider | 50 % | Loudness of every cue; 0 % is silent. |
 | Hover ticks | Checkbox | On | Plays the short tick when the highlighted slice changes. |
+| Trigger switch | Toggle switch | On | Turns the ping wheel trigger on or off. It shows the same state as the pause hotkey and the tray entry, follows them while the dialog is open, and applies immediately — Cancel does not undo it. |
 | Pause hotkey | Text field | Ctrl+Shift+Q | Global shortcut that pauses or resumes pinging. Enter it with plus signs, for example `Ctrl+Shift+Q`. |
 | Open settings when lolping starts | Checkbox | On | Shows the settings window once at start-up; turn it off to start silently. |
 | Start with Windows | Checkbox | Off | Registers lolping to start when you sign in to Windows. |
@@ -255,7 +256,7 @@ listed in section 5.10, and it stays on your machine.
 
 - Exclusive-fullscreen applications and elevated windows can prevent the
   overlay from appearing (see Troubleshooting).
-- lolping has eight fixed sectors in v0.3.3.
+- lolping has eight fixed sectors in v0.3.4.
 - Sound cues cannot overlap: a new cue stops the previous one (see section 5.8).
 - The mouse button is seen by the window underneath before the wheel can appear,
   because a program cannot withhold input without a native hook. lolping installs

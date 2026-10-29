@@ -1,8 +1,8 @@
-# 4. Test plan — lolping v0.3.3
+# 4. Test plan — lolping v0.3.4
 
 ## 4.1 Purpose and scope
 
-This plan describes how lolping v0.3.3 is verified against
+This plan describes how lolping v0.3.4 is verified against
 `docs/02-requirements.md`: unit tests of the pure logic, system tests of the
 complete application on a documented Windows matrix, and measurement protocols
 for the non-functional requirements. Build verification is covered by
@@ -290,3 +290,6 @@ section 6 of the report.
 | TC-44 | Start lolping with "Open settings when lolping starts" on | The settings window opens once, after the tray icon appears |
 | TC-45 | Turn that option off and restart | The app starts silently with only the tray icon |
 | TC-46 | Reuse an old config.json containing `quit_hotkey` | The shortcut is kept and now behaves as the pause hotkey |
+| TC-47 | Turn the trigger switch off, then try Alt + click | The wheel stays closed; the tray entry now offers Resume |
+| TC-48 | Press Ctrl+Shift+Q while the settings window is open | The switch moves to match, without the app being changed twice |
+| TC-49 | Turn the switch off and press Cancel | The trigger stays off: the switch applies immediately, like the hotkey |
