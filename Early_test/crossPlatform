@@ -1,2 +1,11 @@
 # This file is for transfer message between different PC.
--
+
+- PS C:\Users\User\SDfno3_1101> .\.venv\Scripts\Activate.ps1
+- .\.venv\Scripts\Activate.ps1 : The term '.\.venv\Scripts\Activate.ps1' is not recognized as the name of a cmdlet,
+- function, script file, or operable program. Check the spelling of the name, or if a path was included, verify that the
+- path is correct and try again.
+- At line:1 char:1
+- + .\.venv\Scripts\Activate.ps1
+- + ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-     + CategoryInfo          : ObjectNotFound: (.\.venv\Scripts\Activate.ps1:String) [], CommandNotFoundException
+-     + FullyQualifiedErrorId : CommandNotFoundException
