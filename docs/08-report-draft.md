@@ -657,24 +657,27 @@ expected results rather than defects.
 | TC-28 | Exclusive-fullscreen game | **Expected failure** — overlay hidden |
 | TC-30 | Elevated window underneath | **Expected failure** — overlay hidden |
 
-Figures 1–3 were captured on the target machine during the measurement session.
+Figures 1–3 were captured on the target machine with the League-inspired `lol`
+skin and the built-in vector icons (no local icon files installed).
 
 ![Figure 1: the wheel mid-gesture](figures/fig1-wheel.png)
 
-*Figure 1 — the wheel open at the pointer with the "Enemy Missing" slice
-highlighted: eight labelled slices, a gold glow on the hovered slice, and the
-centre disc repeating the current selection.*
+*Figure 1 — the wheel open at the pointer with the `lol` skin: eight gold
+separators, the light beams that spill past the rim, the slice icons on the
+0.65 R circle, and the centre medallion carrying PING and the BACK hint.*
 
 ![Figure 2: the mark left after release](figures/fig2-mark.png)
 
-*Figure 2 — the mark left on screen after release: an expanding ring, a dot
-anchoring the exact point, and the slice name drawn above it with a dark halo so
-it stays legible over bright desktop content.*
+*Figure 2 — the mark left on screen after releasing on Enemy Missing: an
+expanding gold ring with the slice icon inside it, the directional streaks, and
+the slice name drawn above with a dark halo so it stays legible over bright
+desktop content.*
 
 ![Figure 3: the settings window](figures/fig3-settings.png)
 
-*Figure 3 — the settings window: trigger, wheel, slices, feedback and system
-groups, with validation errors shown inline.*
+*Figure 3 — the settings window with the `lol` theme selected: trigger options,
+wheel geometry, the eight slices, ping feedback and the system group. Invalid
+fields are reported inline, under the form.*
 
 ### 6.3 Latency measurement
 
