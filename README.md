@@ -158,6 +158,7 @@ All user data lives in `%APPDATA%\lolping-desktop\`:
 | `docs/06-report-outline.md` | Outline and evidence plan for the final report. |
 | `docs/07-build-and-release.md` | Packaging and release steps. |
 | `docs/08-report-draft.md` | Full report draft, with measurement placeholders marked TBD. |
+| `docs/09-roadmap.md` | Living roadmap: now / next / later, including the DSH plugin and multi-user research. |
 
 ## Limitations
 

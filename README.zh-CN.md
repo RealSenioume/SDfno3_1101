@@ -134,6 +134,7 @@ python -m lolping [--config PATH] [--latency-probe] [--debug] [--self-test]
 | `docs/06-report-outline.md` | 最终报告的大纲与证据计划。 |
 | `docs/07-build-and-release.md` | 打包与发布步骤。 |
 | `docs/08-report-draft.md` | 报告正文草稿，未测量的数字标记为 TBD。 |
+| `docs/09-roadmap.md` | 活路线图：现在 / 接下来 / 更远，含 DSH 插件与多人协作研究。 |
 
 ## 已知限制
 

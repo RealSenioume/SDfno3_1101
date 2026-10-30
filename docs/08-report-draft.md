@@ -818,6 +818,11 @@ goal into a number and an argument.
 6. Accessibility: high-contrast theme, keyboard-only slice commit, and screen
    reader announcement of the committed slice.
 
+Two further tracks are research rather than engineering: exposing the wheel as a
+DSH plugin that turns a committed slice into a spatial intent (search, analysis,
+statistics) and using the wheel for multi-user DSH sessions. Both are described
+in `docs/09-roadmap.md`, which is the maintained version of this list.
+
 ---
 
 ## 9. Conclusion

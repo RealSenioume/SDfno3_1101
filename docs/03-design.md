@@ -665,6 +665,9 @@ Ordered by value per effort:
 6. **Accessibility**: high-contrast theme, keyboard-only sector commit, screen
    reader announcement of the committed name.
 
+The maintained, prioritised version of this list — including a DSH-plugin and a
+multi-user collaboration research track — lives in `docs/09-roadmap.md`.
+
 ## 15. Traceability (requirements → design → tests)
 
 | Requirement group | Design section | Tests |

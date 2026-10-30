@@ -110,6 +110,8 @@ appear; anything unmeasured is "TBD - measure" until it is replaced.
   signing.
 - Optional room or team features, separated from the core overlay.
 - Ping-log analysis, keyboard-driven selection, font scaling, localisation.
+- See `docs/09-roadmap.md` for the maintained, prioritised version, including the
+  DSH-plugin and multi-user tracks.
 
 ## 9 Conclusion
 
