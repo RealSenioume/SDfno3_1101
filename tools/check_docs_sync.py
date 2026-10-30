@@ -28,6 +28,7 @@ __all__ = ["DocumentShape", "compare_shapes", "inspect", "PAIRS"]
 PAIRS: tuple[tuple[str, str], ...] = (
     ("README.md", "README.zh-CN.md"),
     ("PROCESS.md", "PROCESS.zh-CN.md"),
+    ("docs/09-roadmap.md", "docs/09-roadmap.zh-CN.md"),
 )
 
 _HEADING = re.compile(r"^(#{1,6})\s+\S")
